@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Budget Manager — Gestion de budget simple et professionnelle</title>
+  <meta name="description" content="Budget Manager est un outil simple, moderne et professionnel pour gérer vos revenus, vos dépenses et votre solde en toute autonomie.">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.png">
+  <meta name="theme-color" content="#2563eb">
+</head>
+<body>
+
+  <!-- En-tête principal -->
+  <header class="site-header">
+    <div class="container header-container">
+      <div class="brand">
+        <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect width="20" height="14" x="2" y="5" rx="2"></rect>
+          <line x1="2" x2="22" y1="10" y2="10"></line>
+        </svg>
+        <h1 class="site-title">Budget Manager</h1>
+      </div>
+      <nav class="site-nav" aria-label="Navigation principale">
+        <ul class="nav-list">
+          <li><a href="#solde" class="nav-link active">Accueil</a></li>
+          <li><a href="#ajouter" class="nav-link">Ajouter</a></li>
+          <li><a href="#transactions" class="nav-link">Transactions</a></li>
+          <li><a href="#statistiques" class="nav-link">Statistiques</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Notification Toast -->
+  <aside id="toastNotification" class="toast hidden" role="status" aria-live="polite">
+    <span id="toastMessage">Action effectuée</span>
+  </aside>
+
+  <!-- Contenu principal -->
+  <main class="container main-content">
+
+    <!-- 1) MODULE : Solde actuel -->
+    <section id="solde" class="section balance-section" aria-labelledby="balance-title">
+      <div class="section-header-compact">
+        <h2 id="balance-title" class="section-title">Solde actuel</h2>
+        <button type="button" id="toggleInitialBalanceBtn" class="btn btn-subtle" title="Modifier l'argent disponible initial">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+          </svg>
+          <span>Définir l'argent de départ</span>
+        </button>
+      </div>
+
+      <!-- Formulaire pour définir le solde de départ -->
+      <div id="initialBalanceContainer" class="initial-balance-box hidden">
+        <form id="initialBalanceForm" class="initial-balance-form">
+          <div class="form-group-inline">
+            <label for="initialBalanceInput">Argent disponible initial (€) :</label>
+            <input type="number" id="initialBalanceInput" step="0.01" min="0" placeholder="Ex: 1500.00" required>
+            <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
+            <button type="button" id="cancelInitialBalanceBtn" class="btn btn-secondary btn-sm">Annuler</button>
+          </div>
+          <p class="form-help">Ce montant de départ s'ajoute à vos revenus et dépenses pour calculer votre solde disponible réel.</p>
+        </form>
+      </div>
+
+      <!-- Grille des indicateurs financiers -->
+      <div class="balance-grid">
+        <div class="balance-card primary-card">
+          <div class="card-caption">Solde total disponible</div>
+          <div id="currentBalanceDisplay" class="balance-amount neutral">0,00 €</div>
+          <div class="balance-subtext" id="balanceSubtext">Solde initial : 0,00 €</div>
+        </div>
+
+        <div class="balance-card income-summary-card">
+          <div class="card-caption">Total des revenus</div>
+          <div id="quickIncomeDisplay" class="summary-amount income-text">+0,00 €</div>
+          <div class="summary-count" id="quickIncomeCount">0 opération(s)</div>
+        </div>
+
+        <div class="balance-card expense-summary-card">
+          <div class="card-caption">Total des dépenses</div>
+          <div id="quickExpenseDisplay" class="summary-amount expense-text">-0,00 €</div>
+          <div class="summary-count" id="quickExpenseCount">0 opération(s)</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2) MODULE : Ajouter une transaction -->
+    <section id="ajouter" class="section add-transaction-section" aria-labelledby="add-title">
+      <div class="section-card">
+        <h2 id="add-title" class="section-title">Ajouter une transaction</h2>
+        <form id="transactionForm" class="transaction-form" novalidate>
+
+          <div class="form-grid">
+            <!-- Type de transaction -->
+            <div class="form-group">
+              <label for="txType" class="form-label">Type de transaction <span class="required">*</span></label>
+              <div class="type-toggle" role="radiogroup" aria-label="Type de transaction">
+                <label class="toggle-option active" id="labelTypeExpense">
+                  <input type="radio" name="txType" id="typeExpense" value="expense" checked>
+                  <span>Dépense</span>
+                </label>
+                <label class="toggle-option" id="labelTypeIncome">
+                  <input type="radio" name="txType" id="typeIncome" value="income">
+                  <span>Revenu</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Montant -->
+            <div class="form-group">
+              <label for="txAmount" class="form-label">Montant (€) <span class="required">*</span></label>
+              <div class="input-with-symbol">
+                <input type="number" id="txAmount" name="txAmount" step="0.01" min="0.01" placeholder="0.00" required>
+                <span class="currency-symbol">€</span>
+              </div>
+            </div>
+
+            <!-- Catégorie -->
+            <div class="form-group">
+              <label for="txCategory" class="form-label">Catégorie <span class="required">*</span></label>
+              <select id="txCategory" name="txCategory" required>
+                <!-- Options chargées dynamiquement selon le type -->
+              </select>
+            </div>
+
+            <!-- Date -->
+            <div class="form-group">
+              <label for="txDate" class="form-label">Date <span class="required">*</span></label>
+              <input type="date" id="txDate" name="txDate" required>
+            </div>
+          </div>
+
+          <!-- Description (optionnelle) -->
+          <div class="form-group">
+            <label for="txDescription" class="form-label">Description <span class="optional">(optionnelle)</span></label>
+            <input type="text" id="txDescription" name="txDescription" maxlength="120" placeholder="Ex: Courses hebdomadaires, Facture électricité, Prime...">
+          </div>
+
+          <!-- Bouton Ajouter -->
+          <div class="form-actions">
+            <button type="submit" id="submitTxBtn" class="btn btn-primary btn-submit">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span>Ajouter la transaction</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- 3) MODULE : Liste des transactions -->
+    <section id="transactions" class="section transactions-section" aria-labelledby="tx-list-title">
+      <div class="section-card">
+        <div class="section-header-bar">
+          <div>
+            <h2 id="tx-list-title" class="section-title">Liste des transactions</h2>
+            <p class="section-subtitle">Historique ordonné chronologiquement (les plus récentes en premier)</p>
+          </div>
+
+          <!-- Filtres de vue -->
+          <div class="transactions-filters">
+            <div class="filter-group">
+              <label for="filterType" class="visually-hidden">Filtrer par type</label>
+              <select id="filterType" class="select-sm">
+                <option value="all">Toutes les opérations</option>
+                <option value="expense">Dépenses uniquement</option>
+                <option value="income">Revenus uniquement</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="filterSearch" class="visually-hidden">Rechercher</label>
+              <input type="search" id="filterSearch" class="input-sm" placeholder="Rechercher...">
+            </div>
+          </div>
+        </div>
+
+        <!-- Tableau des transactions -->
+        <div class="table-responsive">
+          <table class="transactions-table" id="transactionsTable">
+            <thead>
+              <tr>
+                <th scope="col">Type</th>
+                <th scope="col">Montant</th>
+                <th scope="col">Catégorie</th>
+                <th scope="col">Description</th>
+                <th scope="col">Date</th>
+                <th scope="col" class="text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="transactionsTableBody">
+              <!-- Lignes générées en JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- État vide si aucune transaction -->
+        <div id="emptyState" class="empty-state hidden">
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          <p class="empty-title">Aucune transaction enregistrée</p>
+          <p class="empty-desc">Ajoutez votre premier revenu ou votre première dépense avec le formulaire ci-dessus.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4) MODULE : Statistiques simples -->
+    <section id="statistiques" class="section stats-section" aria-labelledby="stats-title">
+      <div class="section-card">
+        <h2 id="stats-title" class="section-title">Statistiques simples</h2>
+        <p class="section-subtitle">Vue d'ensemble synthétique de vos flux financiers</p>
+
+        <!-- Cartes statistiques -->
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="stat-label">Total des revenus</span>
+            <span id="statTotalIncome" class="stat-value income-text">0,00 €</span>
+            <span id="statIncomeCount" class="stat-detail">0 transaction(s)</span>
+          </div>
+
+          <div class="stat-box">
+            <span class="stat-label">Total des dépenses</span>
+            <span id="statTotalExpense" class="stat-value expense-text">0,00 €</span>
+            <span id="statExpenseCount" class="stat-detail">0 transaction(s)</span>
+          </div>
+
+          <div class="stat-box">
+            <span class="stat-label">Dépense moyenne</span>
+            <span id="statAverageExpense" class="stat-value">0,00 €</span>
+            <span class="stat-detail">Par transaction de dépense</span>
+          </div>
+
+          <div class="stat-box">
+            <span class="stat-label">Solde net des flux</span>
+            <span id="statNetFlow" class="stat-value">0,00 €</span>
+            <span id="statSavingsRate" class="stat-detail">Revenus – Dépenses</span>
+          </div>
+        </div>
+
+        <!-- Répartition par catégories de dépenses -->
+        <div class="category-breakdown-wrapper">
+          <h3 class="subsection-title">Répartition des dépenses par catégorie</h3>
+          <div id="expenseCategoryBreakdown" class="category-breakdown-list">
+            <!-- Liste de barres de répartition générée en JS -->
+          </div>
+        </div>
+
+        <!-- Répartition par catégories de revenus -->
+        <div class="category-breakdown-wrapper" id="incomeCategoryWrapper">
+          <h3 class="subsection-title">Répartition des revenus par catégorie</h3>
+          <div id="incomeCategoryBreakdown" class="category-breakdown-list">
+            <!-- Liste de barres de répartition générée en JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Pied de page -->
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-actions">
+        <!-- MODULE 6 : Export JSON -->
+        <button type="button" id="exportDataBtn" class="btn btn-secondary">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Exporter les données (JSON)</span>
+        </button>
+
+        <button type="button" id="resetDataBtn" class="btn btn-subtle-danger" title="Effacer toutes les transactions enregistrées">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          <span>Réinitialiser les données</span>
+        </button>
+      </div>
+
+      <div class="footer-credits">
+        <p><strong>Budget Manager</strong> — Outil de gestion financière personnelle, simple, sécurisé et 100% local.</p>
+        <p class="legal-note">Toutes les données sont stockées exclusivement dans la mémoire locale de votre navigateur (localStorage). Aucun compte, aucun serveur, aucune collecte.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

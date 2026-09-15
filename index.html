@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Budget Manager — Gestion de budget simple et professionnelle</title>
+  <meta name="description" content="Budget Manager est un outil simple, moderne et professionnel pour gérer vos revenus, vos dépenses et votre solde en toute autonomie.">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Budget Manager">
+</head>
+<body>
+
+  <!-- En-tête principal -->
+  <header class="site-header">
+    <div class="container header-container">
+      <div class="brand">
+        <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect width="20" height="14" x="2" y="5" rx="2"></rect>
+          <line x1="2" x2="22" y1="10" y2="10"></line>
+        </svg>
+        <h1 class="site-title">Budget Manager</h1>
+      </div>
+      <div class="header-right">
+        <nav class="site-nav" aria-label="Navigation principale">
+          <ul class="nav-list">
+            <li><a href="#solde" class="nav-link active">Accueil</a></li>
+            <li><a href="#ajouter" class="nav-link">Ajouter</a></li>
+            <li><a href="#transactions" class="nav-link">Transactions</a></li>
+            <li><a href="#budgets" class="nav-link">Budgets</a></li>
+            <li><a href="#objectifs" class="nav-link">Épargne</a></li>
+            <li><a href="#recurrentes" class="nav-link">Récurrents</a></li>
+            <li><a href="#statistiques" class="nav-link">Statistiques</a></li>
+          </ul>
+        </nav>
+        <button type="button" id="versionBadgeBtn" class="version-badge" title="Afficher le journal des versions (Changelog)">
+          <span class="version-dot"></span>
+          <span>v4.0.0</span>
+        </button>
+        <button type="button" id="themeToggleBtn" class="theme-toggle-btn" title="Changer de thème (Clair / Sombre)" aria-label="Changer de thème">
+          <svg class="icon-theme icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="icon-theme icon-moon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Toast -->
+  <aside id="toastNotification" class="toast hidden" role="status" aria-live="polite">
+    <span id="toastMessage">Action effectuée</span>
+    <button type="button" id="toastActionBtn" class="btn-toast-action hidden">Annuler</button>
+  </aside>
+
+  <!-- Contenu principal -->
+  <main class="container main-content">
+
+    <!-- 1) MODULE : Solde actuel -->
+    <section id="solde" class="section balance-section" aria-labelledby="balance-title">
+      <div class="section-header-compact">
+        <h2 id="balance-title" class="section-title">Solde actuel</h2>
+      </div>
+
+      <!-- Grille des indicateurs financiers -->
+      <div class="balance-grid">
+        <div class="balance-card primary-card">
+          <div class="card-caption">Solde total disponible</div>
+          <div id="currentBalanceDisplay" class="balance-amount neutral">0,00 €</div>
+          <div class="balance-subtext" id="balanceSubtext">Solde initial : 0,00 €</div>
+        </div>
+
+        <div class="balance-card income-summary-card">
+          <div class="card-caption">Total des revenus</div>
+          <div id="quickIncomeDisplay" class="summary-amount income-text">+0,00 €</div>
+          <div class="summary-count" id="quickIncomeCount">0 opération(s)</div>
+        </div>
+
+        <div class="balance-card expense-summary-card">
+          <div class="card-caption">Total des dépenses</div>
+          <div id="quickExpenseDisplay" class="summary-amount expense-text">-0,00 €</div>
+          <div class="summary-count" id="quickExpenseCount">0 opération(s)</div>
+        </div>
+      </div>
+
+      <!-- Sous-module Comptes & Portefeuilles -->
+      <div class="accounts-container">
+        <div class="accounts-header">
+          <div>
+            <h3 class="subsection-title" style="margin-bottom: 0.15rem;">Mes comptes & portefeuilles</h3>
+            <p class="section-subtitle">Gérez vos différents comptes bancaires, livrets et espèces</p>
+          </div>
+          <button type="button" id="openAddAccountBtn" class="btn btn-subtle btn-sm">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>Nouveau compte</span>
+          </button>
+        </div>
+        <div id="accountsGrid" class="accounts-grid">
+          <!-- Injecté dynamiquement en JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 2) MODULE : Ajouter une transaction -->
+    <section id="ajouter" class="section add-transaction-section" aria-labelledby="add-title">
+      <div class="section-card">
+        <h2 id="add-title" class="section-title">Ajouter une transaction</h2>
+        <form id="transactionForm" class="transaction-form" novalidate>
+
+          <div class="form-grid">
+            <!-- Type de transaction -->
+            <div class="form-group">
+              <label class="form-label">Type de transaction <span class="required">*</span></label>
+              <div class="type-toggle" role="radiogroup" aria-label="Type de transaction">
+                <label class="toggle-option active" id="labelTypeExpense">
+                  <input type="radio" name="txType" id="typeExpense" value="expense" checked>
+                  <span>Dépense</span>
+                </label>
+                <label class="toggle-option" id="labelTypeIncome">
+                  <input type="radio" name="txType" id="typeIncome" value="income">
+                  <span>Revenu</span>
+                </label>
+                <label class="toggle-option" id="labelTypeTransfer">
+                  <input type="radio" name="txType" id="typeTransfer" value="transfer">
+                  <span>Virement</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Montant -->
+            <div class="form-group">
+              <label for="txAmount" class="form-label">Montant (€) <span class="required">*</span></label>
+              <div class="input-with-symbol">
+                <input type="number" id="txAmount" name="txAmount" step="0.01" min="0.01" placeholder="0.00" required>
+                <span class="currency-symbol">€</span>
+              </div>
+            </div>
+
+            <!-- Compte source / débité -->
+            <div class="form-group" id="txAccountGroup">
+              <label for="txAccount" class="form-label" id="labelTxAccount">Compte / Portefeuille <span class="required">*</span></label>
+              <select id="txAccount" name="txAccount" required>
+                <!-- Options chargées dynamiquement -->
+              </select>
+            </div>
+
+            <!-- Compte destination / crédité (affiché uniquement si Virement) -->
+            <div class="form-group hidden" id="txTargetAccountGroup">
+              <label for="txTargetAccount" class="form-label">Compte crédité (Destination) <span class="required">*</span></label>
+              <select id="txTargetAccount" name="txTargetAccount">
+                <!-- Options chargées dynamiquement -->
+              </select>
+            </div>
+
+            <!-- Catégorie (masquée si Virement) -->
+            <div class="form-group" id="txCategoryGroup">
+              <label for="txCategory" class="form-label">Catégorie <span class="required">*</span></label>
+              <select id="txCategory" name="txCategory" required>
+                <!-- Options chargées dynamiquement selon le type -->
+              </select>
+            </div>
+
+            <!-- Date -->
+            <div class="form-group">
+              <label for="txDate" class="form-label">Date <span class="required">*</span></label>
+              <input type="date" id="txDate" name="txDate" required>
+            </div>
+          </div>
+
+          <!-- Description (optionnelle) -->
+          <div class="form-group">
+            <label for="txDescription" class="form-label">Description <span class="optional">(optionnelle)</span></label>
+            <input type="text" id="txDescription" name="txDescription" maxlength="120" placeholder="Ex: Courses hebdomadaires, Facture électricité, Prime...">
+          </div>
+
+          <!-- Bouton Ajouter -->
+          <div class="form-actions">
+            <button type="submit" id="submitTxBtn" class="btn btn-primary btn-submit">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span>Ajouter la transaction</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- 3) MODULE : Liste des transactions -->
+    <section id="transactions" class="section transactions-section" aria-labelledby="tx-list-title">
+      <div class="section-card">
+        <div class="section-header-bar">
+          <div>
+            <h2 id="tx-list-title" class="section-title">Liste des transactions</h2>
+            <p class="section-subtitle">Historique ordonné chronologiquement (les plus récentes en premier)</p>
+          </div>
+
+          <!-- Filtres de vue -->
+          <div class="transactions-filters">
+            <div class="filter-group">
+              <label for="filterAccount" class="visually-hidden">Filtrer par compte</label>
+              <select id="filterAccount" class="select-sm">
+                <option value="all">Tous les comptes</option>
+                <!-- Chargé dynamiquement -->
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="filterPeriod" class="visually-hidden">Filtrer par période</label>
+              <select id="filterPeriod" class="select-sm">
+                <option value="all">Toutes les périodes</option>
+                <option value="this-month">Ce mois-ci</option>
+                <option value="last-month">Mois dernier</option>
+                <option value="this-year">Cette année</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="filterType" class="visually-hidden">Filtrer par type</label>
+              <select id="filterType" class="select-sm">
+                <option value="all">Toutes les opérations</option>
+                <option value="expense">Dépenses uniquement</option>
+                <option value="income">Revenus uniquement</option>
+                <option value="transfer">Virements uniquement</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="filterSearch" class="visually-hidden">Rechercher</label>
+              <input type="search" id="filterSearch" class="input-sm" placeholder="Rechercher...">
+            </div>
+          </div>
+        </div>
+
+        <!-- Tableau des transactions -->
+        <div class="table-responsive">
+          <table class="transactions-table" id="transactionsTable">
+            <thead>
+              <tr>
+                <th scope="col">Type</th>
+                <th scope="col">Montant</th>
+                <th scope="col">Compte</th>
+                <th scope="col">Catégorie</th>
+                <th scope="col">Description</th>
+                <th scope="col">Date</th>
+                <th scope="col" class="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="transactionsTableBody">
+              <!-- Lignes générées en JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- État vide si aucune transaction -->
+        <div id="emptyState" class="empty-state hidden">
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          <p class="empty-title">Aucune transaction enregistrée</p>
+          <p class="empty-desc">Ajoutez votre premier revenu ou votre première dépense avec le formulaire ci-dessus.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4) MODULE : Plafonds budgétaires & Alertes -->
+    <section id="budgets" class="section budgets-section" aria-labelledby="budgets-title">
+      <div class="section-card">
+        <div class="section-header-bar">
+          <div>
+            <h2 id="budgets-title" class="section-title">Plafonds budgétaires du mois</h2>
+            <p class="section-subtitle">Fixez des limites de dépenses mensuelles par catégorie et suivez leur consommation en temps réel</p>
+          </div>
+          <button type="button" id="openAddBudgetBtn" class="btn btn-primary btn-sm">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>Définir un budget</span>
+          </button>
+        </div>
+
+        <!-- Synthèse globale des budgets du mois -->
+        <div id="budgetsGlobalSummary" class="budgets-summary-box">
+          <div class="budget-summary-item">
+            <span class="summary-label">Budget alloué (ce mois)</span>
+            <span id="budgetTotalAllocated" class="summary-val">0,00 €</span>
+          </div>
+          <div class="budget-summary-item">
+            <span class="summary-label">Total dépensé</span>
+            <span id="budgetTotalSpent" class="summary-val">0,00 €</span>
+          </div>
+          <div class="budget-summary-item">
+            <span class="summary-label">Reste disponible</span>
+            <span id="budgetTotalRemaining" class="summary-val">0,00 €</span>
+          </div>
+        </div>
+
+        <!-- Grille des cartes de budgets par catégorie -->
+        <div id="budgetsGrid" class="budgets-grid">
+          <!-- Cartes générées en JS -->
+        </div>
+
+        <!-- État vide pour les budgets -->
+        <div id="emptyBudgets" class="empty-state hidden">
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+          </svg>
+          <p class="empty-title">Aucun plafond budgétaire configuré</p>
+          <p class="empty-desc">Cliquez sur « Définir un budget » pour fixer un montant mensuel maximum pour vos catégories de dépenses.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5) MODULE : Objectifs d'épargne & Cagnottes -->
+    <section id="objectifs" class="section goals-section" aria-labelledby="goals-title">
+      <div class="section-card">
+        <div class="section-header-bar">
+          <div>
+            <h2 id="goals-title" class="section-title">Objectifs d'épargne & Cagnottes</h2>
+            <p class="section-subtitle">Définissez vos projets financiers (vacances, fonds d'urgence, projet...) et suivez votre progression</p>
+          </div>
+          <button type="button" id="openAddGoalBtn" class="btn btn-primary btn-sm">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>Nouvel objectif</span>
+          </button>
+        </div>
+
+        <!-- Synthèse globale de l'épargne -->
+        <div id="goalsGlobalSummary" class="budgets-summary-box">
+          <div class="budget-summary-item">
+            <span class="summary-label">Total épargné</span>
+            <span id="goalTotalSaved" class="summary-val income-text">0,00 €</span>
+          </div>
+          <div class="budget-summary-item">
+            <span class="summary-label">Cible totale visée</span>
+            <span id="goalTotalTarget" class="summary-val">0,00 €</span>
+          </div>
+          <div class="budget-summary-item">
+            <span class="summary-label">Progression globale</span>
+            <span id="goalGlobalRate" class="summary-val">0 %</span>
+          </div>
+        </div>
+
+        <!-- Grille des objectifs d'épargne -->
+        <div id="goalsGrid" class="goals-grid">
+          <!-- Injecté dynamiquement en JS -->
+        </div>
+
+        <!-- État vide -->
+        <div id="emptyGoals" class="empty-state hidden">
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path>
+          </svg>
+          <p class="empty-title">Aucun objectif d'épargne en cours</p>
+          <p class="empty-desc">Cliquez sur « Nouvel objectif » pour créer une cagnotte d'épargne et visualiser votre avancée.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6) MODULE : Transactions récurrentes & Abonnements -->
+    <section id="recurrentes" class="section recurring-section" aria-labelledby="rec-title">
+      <div class="section-card">
+        <div class="section-header-bar">
+          <div>
+            <h2 id="rec-title" class="section-title">Transactions récurrentes & Abonnements</h2>
+            <p class="section-subtitle">Automatisez vos charges fixes (loyer, abonnements, factures) et revenus récurrents (salaire)</p>
+          </div>
+          <div class="section-actions-group">
+            <button type="button" id="applyRecurringBtn" class="btn btn-secondary btn-sm" title="Insérer automatiquement les récurrences dues pour ce mois">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+              <span>Appliquer ce mois-ci</span>
+            </button>
+            <button type="button" id="openAddRecurringBtn" class="btn btn-primary btn-sm">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span>Nouvelle récurrence</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Synthèse mensuelle des récurrences -->
+        <div id="recurringGlobalSummary" class="budgets-summary-box">
+          <div class="budget-summary-item">
+            <span class="summary-label">Charges récurrentes / mois</span>
+            <span id="recSummaryExpenses" class="summary-val expense-text">0,00 €</span>
+          </div>
+          <div class="budget-summary-item">
+            <span class="summary-label">Revenus récurrents / mois</span>
+            <span id="recSummaryIncome" class="summary-val income-text">0,00 €</span>
+          </div>
+          <div class="budget-summary-item">
+            <span class="summary-label">Impact net mensuel</span>
+            <span id="recSummaryNet" class="summary-val">0,00 €</span>
+          </div>
+        </div>
+
+        <!-- Liste des opérations récurrentes -->
+        <div id="recurringGrid" class="recurring-grid">
+          <!-- Injecté dynamiquement en JS -->
+        </div>
+
+        <!-- État vide -->
+        <div id="emptyRecurring" class="empty-state hidden">
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+          </svg>
+          <p class="empty-title">Aucune transaction récurrente configurée</p>
+          <p class="empty-desc">Ajoutez vos abonnements et charges fixes pour prévoir votre budget et les insérer facilement chaque mois.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7) MODULE : Statistiques simples & Graphiques -->
+    <section id="statistiques" class="section stats-section" aria-labelledby="stats-title">
+      <div class="section-card">
+        <h2 id="stats-title" class="section-title">Statistiques & Analyse</h2>
+        <p class="section-subtitle">Vue d'ensemble synthétique de vos flux financiers selon la période sélectionnée</p>
+
+        <!-- Cartes statistiques -->
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="stat-label">Total des revenus</span>
+            <span id="statTotalIncome" class="stat-value income-text">0,00 €</span>
+            <span id="statIncomeCount" class="stat-detail">0 transaction(s)</span>
+          </div>
+
+          <div class="stat-box">
+            <span class="stat-label">Total des dépenses</span>
+            <span id="statTotalExpense" class="stat-value expense-text">0,00 €</span>
+            <span id="statExpenseCount" class="stat-detail">0 transaction(s)</span>
+          </div>
+
+          <div class="stat-box">
+            <span class="stat-label">Dépense moyenne</span>
+            <span id="statAverageExpense" class="stat-value">0,00 €</span>
+            <span class="stat-detail">Par transaction de dépense</span>
+          </div>
+
+          <div class="stat-box">
+            <span class="stat-label">Solde net des flux</span>
+            <span id="statNetFlow" class="stat-value">0,00 €</span>
+            <span id="statSavingsRate" class="stat-detail">Revenus – Dépenses</span>
+          </div>
+        </div>
+
+        <!-- Graphiques Donut interactifs -->
+        <div class="charts-overview-grid">
+          <div class="chart-panel" id="expenseChartPanel">
+            <h3 class="subsection-title">Répartition visuelle des dépenses</h3>
+            <div id="expenseDonutContainer" class="donut-chart-container">
+              <!-- SVG Donut injecté en JS -->
+            </div>
+          </div>
+          <div class="chart-panel" id="incomeChartPanel">
+            <h3 class="subsection-title">Répartition visuelle des revenus</h3>
+            <div id="incomeDonutContainer" class="donut-chart-container">
+              <!-- SVG Donut injecté en JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Répartition par catégories de dépenses -->
+        <div class="category-breakdown-wrapper">
+          <h3 class="subsection-title">Détail des dépenses par catégorie</h3>
+          <div id="expenseCategoryBreakdown" class="category-breakdown-list">
+            <!-- Liste de barres de répartition générée en JS -->
+          </div>
+        </div>
+
+        <!-- Répartition par catégories de revenus -->
+        <div class="category-breakdown-wrapper" id="incomeCategoryWrapper">
+          <h3 class="subsection-title">Détail des revenus par catégorie</h3>
+          <div id="incomeCategoryBreakdown" class="category-breakdown-list">
+            <!-- Liste de barres de répartition générée en JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modale Édition de Transaction -->
+  <div id="editModal" class="modal-overlay hidden" role="dialog" aria-labelledby="modalTitle" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalTitle" class="modal-title">Modifier la transaction</h3>
+        <button type="button" id="closeEditModalBtn" class="btn-close-modal" aria-label="Fermer la boîte de dialogue">&times;</button>
+      </div>
+      <form id="editTransactionForm" class="edit-transaction-form" novalidate>
+        <input type="hidden" id="editTxId">
+        
+        <div class="form-group">
+          <label class="form-label">Type de transaction <span class="required">*</span></label>
+          <div class="type-toggle" role="radiogroup" aria-label="Type de transaction">
+            <label class="toggle-option" id="labelEditTypeExpense">
+              <input type="radio" name="editTxType" id="editTypeExpense" value="expense">
+              <span>Dépense</span>
+            </label>
+            <label class="toggle-option" id="labelEditTypeIncome">
+              <input type="radio" name="editTxType" id="editTypeIncome" value="income">
+              <span>Revenu</span>
+            </label>
+            <label class="toggle-option" id="labelEditTypeTransfer">
+              <input type="radio" name="editTxType" id="editTypeTransfer" value="transfer">
+              <span>Virement</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="editTxAmount" class="form-label">Montant (€) <span class="required">*</span></label>
+          <div class="input-with-symbol">
+            <input type="number" id="editTxAmount" name="editTxAmount" step="0.01" min="0.01" required>
+            <span class="currency-symbol">€</span>
+          </div>
+        </div>
+
+        <div class="form-group" id="editTxAccountGroup">
+          <label for="editTxAccount" class="form-label" id="labelEditTxAccount">Compte / Portefeuille <span class="required">*</span></label>
+          <select id="editTxAccount" name="editTxAccount" required></select>
+        </div>
+
+        <div class="form-group hidden" id="editTxTargetAccountGroup">
+          <label for="editTxTargetAccount" class="form-label">Compte crédité (Destination) <span class="required">*</span></label>
+          <select id="editTxTargetAccount" name="editTxTargetAccount"></select>
+        </div>
+
+        <div class="form-group" id="editTxCategoryGroup">
+          <label for="editTxCategory" class="form-label">Catégorie <span class="required">*</span></label>
+          <select id="editTxCategory" name="editTxCategory" required></select>
+        </div>
+
+        <div class="form-group">
+          <label for="editTxDate" class="form-label">Date <span class="required">*</span></label>
+          <input type="date" id="editTxDate" name="editTxDate" required>
+        </div>
+
+        <div class="form-group">
+          <label for="editTxDescription" class="form-label">Description <span class="optional">(optionnelle)</span></label>
+          <input type="text" id="editTxDescription" name="editTxDescription" maxlength="120" placeholder="Ex: Courses, Facture...">
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" id="cancelEditModalBtn" class="btn btn-secondary">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modale Configuration Budget -->
+  <div id="budgetModal" class="modal-overlay hidden" role="dialog" aria-labelledby="budgetModalTitle" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="budgetModalTitle" class="modal-title">Définir un plafond budgétaire</h3>
+        <button type="button" id="closeBudgetModalBtn" class="btn-close-modal" aria-label="Fermer la boîte de dialogue">&times;</button>
+      </div>
+      <form id="budgetForm" class="budget-modal-form" novalidate>
+        <input type="hidden" id="budgetOriginalCategory">
+        <div class="form-group">
+          <label for="budgetCategorySelect" class="form-label">Catégorie de dépense <span class="required">*</span></label>
+          <select id="budgetCategorySelect" required>
+            <!-- Options chargées dynamiquement -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="budgetLimitInput" class="form-label">Plafond mensuel max (€) <span class="required">*</span></label>
+          <div class="input-with-symbol">
+            <input type="number" id="budgetLimitInput" step="10" min="1" placeholder="Ex: 350.00" required>
+            <span class="currency-symbol">€</span>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="cancelBudgetModalBtn" class="btn btn-secondary">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modale Gestion Compte / Portefeuille -->
+  <div id="accountModal" class="modal-overlay hidden" role="dialog" aria-labelledby="accountModalTitle" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="accountModalTitle" class="modal-title">Nouveau compte / portefeuille</h3>
+        <button type="button" id="closeAccountModalBtn" class="btn-close-modal" aria-label="Fermer la boîte de dialogue">&times;</button>
+      </div>
+      <form id="accountForm" class="modal-form" novalidate>
+        <input type="hidden" id="accountEditId">
+        <div class="form-group">
+          <label for="accountNameInput" class="form-label">Nom du compte <span class="required">*</span></label>
+          <input type="text" id="accountNameInput" placeholder="Ex: Compte Courant BNP, Livret A, Espèces..." required maxlength="40">
+        </div>
+        <div class="form-group">
+          <label for="accountTypeSelect" class="form-label">Type de compte <span class="required">*</span></label>
+          <select id="accountTypeSelect" required>
+            <option value="checking">Compte Courant</option>
+            <option value="savings">Livret / Épargne</option>
+            <option value="cash">Espèces / Portefeuille physique</option>
+            <option value="other">Autre compte</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="accountInitialBalanceInput" class="form-label">Solde initial (€) <span class="required">*</span></label>
+          <div class="input-with-symbol">
+            <input type="number" id="accountInitialBalanceInput" step="0.01" min="0" placeholder="0.00" required>
+            <span class="currency-symbol">€</span>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="cancelAccountModalBtn" class="btn btn-secondary">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modale Gestion Objectif d'épargne -->
+  <div id="goalModal" class="modal-overlay hidden" role="dialog" aria-labelledby="goalModalTitle" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="goalModalTitle" class="modal-title">Nouvel objectif d'épargne</h3>
+        <button type="button" id="closeGoalModalBtn" class="btn-close-modal" aria-label="Fermer la boîte de dialogue">&times;</button>
+      </div>
+      <form id="goalForm" class="modal-form" novalidate>
+        <input type="hidden" id="goalEditId">
+        <div class="form-group">
+          <label for="goalNameInput" class="form-label">Nom du projet / Cagnotte <span class="required">*</span></label>
+          <input type="text" id="goalNameInput" placeholder="Ex: Vacances d'été, Fonds d'urgence, Permis..." required maxlength="50">
+        </div>
+        <div class="form-group">
+          <label for="goalTargetInput" class="form-label">Montant cible visé (€) <span class="required">*</span></label>
+          <div class="input-with-symbol">
+            <input type="number" id="goalTargetInput" step="10" min="1" placeholder="Ex: 1500.00" required>
+            <span class="currency-symbol">€</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="goalCurrentInput" class="form-label">Montant déjà épargné (€)</label>
+          <div class="input-with-symbol">
+            <input type="number" id="goalCurrentInput" step="1" min="0" placeholder="0.00">
+            <span class="currency-symbol">€</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="goalDateInput" class="form-label">Date cible souhaitée <span class="optional">(optionnelle)</span></label>
+          <input type="date" id="goalDateInput">
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="cancelGoalModalBtn" class="btn btn-secondary">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modale Versement / Retrait Épargne -->
+  <div id="goalTransferModal" class="modal-overlay hidden" role="dialog" aria-labelledby="goalTransferTitle" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="goalTransferTitle" class="modal-title">Alimenter l'objectif</h3>
+        <button type="button" id="closeGoalTransferModalBtn" class="btn-close-modal" aria-label="Fermer la boîte de dialogue">&times;</button>
+      </div>
+      <form id="goalTransferForm" class="modal-form" novalidate>
+        <input type="hidden" id="goalTransferId">
+        <input type="hidden" id="goalTransferType" value="deposit">
+        
+        <p id="goalTransferDesc" class="form-help" style="margin-bottom: 1rem; font-size: 0.95rem; font-weight: 500;">Projet : <strong>Voyage</strong></p>
+
+        <div class="form-group">
+          <label for="goalTransferAmountInput" class="form-label">Montant (€) <span class="required">*</span></label>
+          <div class="input-with-symbol">
+            <input type="number" id="goalTransferAmountInput" step="0.01" min="0.01" placeholder="Ex: 50.00" required>
+            <span class="currency-symbol">€</span>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="cancelGoalTransferModalBtn" class="btn btn-secondary">Annuler</button>
+          <button type="submit" id="submitGoalTransferBtn" class="btn btn-primary">Confirmer le versement</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modale Gestion Transaction Récurrente -->
+  <div id="recurringModal" class="modal-overlay hidden" role="dialog" aria-labelledby="recurringModalTitle" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="recurringModalTitle" class="modal-title">Nouvelle opération récurrente</h3>
+        <button type="button" id="closeRecurringModalBtn" class="btn-close-modal" aria-label="Fermer la boîte de dialogue">&times;</button>
+      </div>
+      <form id="recurringForm" class="modal-form" novalidate>
+        <input type="hidden" id="recurringEditId">
+        
+        <div class="form-group">
+          <label class="form-label">Type d'opération <span class="required">*</span></label>
+          <div class="type-toggle" role="radiogroup" aria-label="Type de récurrence">
+            <label class="toggle-option active" id="labelRecTypeExpense">
+              <input type="radio" name="recType" id="recTypeExpense" value="expense" checked>
+              <span>Dépense (Abonnement / Charge)</span>
+            </label>
+            <label class="toggle-option" id="labelRecTypeIncome">
+              <input type="radio" name="recType" id="recTypeIncome" value="income">
+              <span>Revenu (Salaire / Rente)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="recNameInput" class="form-label">Nom / Intitulé <span class="required">*</span></label>
+          <input type="text" id="recNameInput" placeholder="Ex: Loyer, Netflix, Salaire, Salle de sport..." required maxlength="60">
+        </div>
+
+        <div class="form-group">
+          <label for="recAmountInput" class="form-label">Montant (€) <span class="required">*</span></label>
+          <div class="input-with-symbol">
+            <input type="number" id="recAmountInput" step="0.01" min="0.01" placeholder="Ex: 12.99" required>
+            <span class="currency-symbol">€</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="recAccountSelect" class="form-label">Compte associé <span class="required">*</span></label>
+          <select id="recAccountSelect" required></select>
+        </div>
+
+        <div class="form-group">
+          <label for="recCategorySelect" class="form-label">Catégorie <span class="required">*</span></label>
+          <select id="recCategorySelect" required></select>
+        </div>
+
+        <div class="form-group">
+          <label for="recDayInput" class="form-label">Jour de prélèvement / versement (1 à 31) <span class="required">*</span></label>
+          <input type="number" id="recDayInput" min="1" max="31" value="1" required>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" id="cancelRecurringModalBtn" class="btn btn-secondary">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modale Journal des versions (Changelog) -->
+  <div id="changelogModal" class="modal-overlay hidden" role="dialog" aria-labelledby="changelogModalTitle" aria-modal="true">
+    <div class="modal-card modal-large">
+      <div class="modal-header">
+        <div class="modal-title-with-badge">
+          <h3 id="changelogModalTitle" class="modal-title">Journal des versions</h3>
+          <span class="version-tag">Actuelle : v4.0.0</span>
+        </div>
+        <button type="button" id="closeChangelogModalBtn" class="btn-close-modal" aria-label="Fermer le journal des versions">&times;</button>
+      </div>
+      <div class="changelog-body" id="changelogContainer">
+        <!-- Historique des versions injecté dynamiquement -->
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="closeChangelogFooterBtn" class="btn btn-secondary">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pied de page -->
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-actions">
+        <!-- Export JSON -->
+        <button type="button" id="exportDataBtn" class="btn btn-secondary">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Exporter (JSON)</span>
+        </button>
+
+        <!-- Export CSV -->
+        <button type="button" id="exportCsvBtn" class="btn btn-secondary">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Exporter (CSV)</span>
+        </button>
+
+        <!-- Import JSON/CSV -->
+        <label for="importFileInput" class="btn btn-secondary btn-file-label" title="Importer des transactions depuis un fichier JSON ou CSV">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          <span>Importer (JSON / CSV)</span>
+          <input type="file" id="importFileInput" accept=".json,.csv" class="visually-hidden">
+        </label>
+
+        <button type="button" id="resetDataBtn" class="btn btn-subtle-danger" title="Effacer toutes les transactions enregistrées">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          <span>Réinitialiser</span>
+        </button>
+      </div>
+
+      <div class="footer-credits">
+        <p><strong>Budget Manager</strong> <button type="button" id="footerVersionBtn" class="footer-version-btn" title="Voir les notes de version">v4.0.0</button> — Outil de gestion financière personnelle, simple, sécurisé et 100% local.</p>
+        <p class="legal-note">Toutes les données sont stockées exclusivement dans la mémoire locale de votre navigateur (localStorage). Aucun compte, aucun serveur, aucune collecte.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
