@@ -3,7 +3,7 @@
  * Gestion du cache hors-ligne pour un fonctionnement autonome
  */
 
-const CACHE_NAME = 'budget-manager-cache-v4.0.0';
+const CACHE_NAME = 'budget-manager-cache-v5.0.1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -41,30 +41,35 @@ self.addEventListener('activate', (event) => {
 
 // Interception des requêtes : Réseau d'abord, secours sur le cache si hors-ligne
 self.addEventListener('fetch', (event) => {
-  // Ignorer les requêtes non GET ou d'autres schémas
+  // Ignorer les requêtes non GET, d'autres schémas ou d'autres origines
   if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) {
+    return;
+  }
+  if (new URL(event.request.url).origin !== self.location.origin) {
     return;
   }
 
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
           const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
+          event.waitUntil(
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone))
+          );
         }
         return networkResponse;
       })
       .catch(() => {
-        return caches.match(event.request).then((cachedResponse) => {
+        return caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
           if (cachedResponse) {
             return cachedResponse;
           }
           if (event.request.mode === 'navigate') {
             return caches.match('./index.html');
           }
+          // Toujours renvoyer une Response (respondWith n'accepte pas undefined)
+          return Response.error();
         });
       })
   );

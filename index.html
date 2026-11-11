@@ -5,12 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Budget Manager — Gestion de budget simple et professionnelle</title>
   <meta name="description" content="Budget Manager est un outil simple, moderne et professionnel pour gérer vos revenus, vos dépenses et votre solde en toute autonomie.">
+  <meta name="color-scheme" content="light dark">
+  <!-- Applique le thème avant l'affichage pour éviter un flash blanc en mode sombre -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('budget_manager_theme');
+        if (t !== 'dark' && t !== 'light') {
+          t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.png">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#2563eb">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Budget Manager">
@@ -41,7 +55,7 @@
         </nav>
         <button type="button" id="versionBadgeBtn" class="version-badge" title="Afficher le journal des versions (Changelog)">
           <span class="version-dot"></span>
-          <span>v4.0.0</span>
+          <span>v5.0.1</span>
         </button>
         <button type="button" id="themeToggleBtn" class="theme-toggle-btn" title="Changer de thème (Clair / Sombre)" aria-label="Changer de thème">
           <svg class="icon-theme icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -72,6 +86,23 @@
   <!-- Contenu principal -->
   <main class="container main-content">
 
+    <!-- Rappel de sauvegarde (affiché si aucun export JSON depuis 30 jours) -->
+    <div id="backupReminder" class="backup-banner hidden" role="status">
+      <svg class="backup-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+        <polyline points="7 3 7 8 15 8"></polyline>
+      </svg>
+      <div class="backup-banner-text">
+        <strong>Pensez à sauvegarder vos données</strong>
+        <span id="backupReminderText"></span>
+      </div>
+      <div class="backup-banner-actions">
+        <button type="button" id="backupNowBtn" class="btn btn-primary btn-sm">Exporter maintenant</button>
+        <button type="button" id="backupLaterBtn" class="btn btn-subtle btn-sm">Me le rappeler dans 7 jours</button>
+      </div>
+    </div>
+
     <!-- 1) MODULE : Solde actuel -->
     <section id="solde" class="section balance-section" aria-labelledby="balance-title">
       <div class="section-header-compact">
@@ -96,6 +127,13 @@
           <div class="card-caption">Total des dépenses</div>
           <div id="quickExpenseDisplay" class="summary-amount expense-text">-0,00 €</div>
           <div class="summary-count" id="quickExpenseCount">0 opération(s)</div>
+        </div>
+
+        <div class="balance-card forecast-card" id="forecastCard" title="Solde actuel + opérations récurrentes restant à passer ce mois-ci">
+          <div class="card-caption" id="forecastCaption">Prévision fin de mois</div>
+          <div id="forecastDisplay" class="summary-amount">0,00 €</div>
+          <div class="summary-count" id="forecastDetail">Aucune opération récurrente restante ce mois-ci</div>
+          <div class="forecast-alert hidden" id="forecastAlert" role="alert"></div>
         </div>
       </div>
 
@@ -123,7 +161,16 @@
     <!-- 2) MODULE : Ajouter une transaction -->
     <section id="ajouter" class="section add-transaction-section" aria-labelledby="add-title">
       <div class="section-card">
-        <h2 id="add-title" class="section-title">Ajouter une transaction</h2>
+        <div class="section-header-bar section-header-tight">
+          <h2 id="add-title" class="section-title">Ajouter une transaction</h2>
+          <button type="button" id="openCategoriesBtn" class="btn btn-subtle btn-sm" title="Créer, renommer, colorer ou supprimer vos catégories">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+              <line x1="7" y1="7" x2="7.01" y2="7"></line>
+            </svg>
+            <span>Gérer les catégories</span>
+          </button>
+        </div>
         <form id="transactionForm" class="transaction-form" novalidate>
 
           <div class="form-grid">
@@ -269,6 +316,9 @@
           </table>
         </div>
 
+        <!-- Pagination (générée en JS) -->
+        <div id="transactionsPagination" class="pagination-bar hidden"></div>
+
         <!-- État vide si aucune transaction -->
         <div id="emptyState" class="empty-state hidden">
           <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -388,9 +438,14 @@
         <div class="section-header-bar">
           <div>
             <h2 id="rec-title" class="section-title">Transactions récurrentes & Abonnements</h2>
-            <p class="section-subtitle">Automatisez vos charges fixes (loyer, abonnements, factures) et revenus récurrents (salaire)</p>
+            <p class="section-subtitle">Automatisez vos charges fixes (loyer, abonnements, factures) et revenus récurrents (salaire) : hebdomadaires, mensuels, trimestriels ou annuels</p>
           </div>
           <div class="section-actions-group">
+            <label class="switch-label" title="Ajoute automatiquement les opérations dont la date est passée, à chaque ouverture de l'application">
+              <input type="checkbox" id="autoApplyToggle" class="switch-input" checked>
+              <span class="switch-track" aria-hidden="true"></span>
+              <span>Application auto</span>
+            </label>
             <button type="button" id="applyRecurringBtn" class="btn btn-secondary btn-sm" title="Insérer automatiquement les récurrences dues pour ce mois">
               <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
@@ -410,11 +465,11 @@
         <!-- Synthèse mensuelle des récurrences -->
         <div id="recurringGlobalSummary" class="budgets-summary-box">
           <div class="budget-summary-item">
-            <span class="summary-label">Charges récurrentes / mois</span>
+            <span class="summary-label">Charges récurrentes / mois (équivalent)</span>
             <span id="recSummaryExpenses" class="summary-val expense-text">0,00 €</span>
           </div>
           <div class="budget-summary-item">
-            <span class="summary-label">Revenus récurrents / mois</span>
+            <span class="summary-label">Revenus récurrents / mois (équivalent)</span>
             <span id="recSummaryIncome" class="summary-val income-text">0,00 €</span>
           </div>
           <div class="budget-summary-item">
@@ -595,7 +650,7 @@
         <div class="form-group">
           <label for="budgetLimitInput" class="form-label">Plafond mensuel max (€) <span class="required">*</span></label>
           <div class="input-with-symbol">
-            <input type="number" id="budgetLimitInput" step="10" min="1" placeholder="Ex: 350.00" required>
+            <input type="number" id="budgetLimitInput" step="0.01" min="1" placeholder="Ex: 350.00" required>
             <span class="currency-symbol">€</span>
           </div>
         </div>
@@ -632,7 +687,7 @@
         <div class="form-group">
           <label for="accountInitialBalanceInput" class="form-label">Solde initial (€) <span class="required">*</span></label>
           <div class="input-with-symbol">
-            <input type="number" id="accountInitialBalanceInput" step="0.01" min="0" placeholder="0.00" required>
+            <input type="number" id="accountInitialBalanceInput" step="0.01" placeholder="0.00" required>
             <span class="currency-symbol">€</span>
           </div>
         </div>
@@ -660,20 +715,25 @@
         <div class="form-group">
           <label for="goalTargetInput" class="form-label">Montant cible visé (€) <span class="required">*</span></label>
           <div class="input-with-symbol">
-            <input type="number" id="goalTargetInput" step="10" min="1" placeholder="Ex: 1500.00" required>
+            <input type="number" id="goalTargetInput" step="0.01" min="1" placeholder="Ex: 1500.00" required>
             <span class="currency-symbol">€</span>
           </div>
         </div>
         <div class="form-group">
           <label for="goalCurrentInput" class="form-label">Montant déjà épargné (€)</label>
           <div class="input-with-symbol">
-            <input type="number" id="goalCurrentInput" step="1" min="0" placeholder="0.00">
+            <input type="number" id="goalCurrentInput" step="0.01" min="0" placeholder="0.00">
             <span class="currency-symbol">€</span>
           </div>
         </div>
         <div class="form-group">
           <label for="goalDateInput" class="form-label">Date cible souhaitée <span class="optional">(optionnelle)</span></label>
           <input type="date" id="goalDateInput">
+        </div>
+        <div class="form-group">
+          <label for="goalAccountSelect" class="form-label">Compte d'épargne associé <span class="optional">(optionnel)</span></label>
+          <select id="goalAccountSelect"></select>
+          <p class="form-help">Si un compte est associé, chaque versement ou retrait crée un vrai virement (ex. Compte Courant ➔ Livret A) et met à jour le solde des comptes.</p>
         </div>
         <div class="modal-actions">
           <button type="button" id="cancelGoalModalBtn" class="btn btn-secondary">Annuler</button>
@@ -702,6 +762,10 @@
             <input type="number" id="goalTransferAmountInput" step="0.01" min="0.01" placeholder="Ex: 50.00" required>
             <span class="currency-symbol">€</span>
           </div>
+        </div>
+        <div class="form-group hidden" id="goalTransferAccountGroup">
+          <label for="goalTransferAccountSelect" class="form-label" id="goalTransferAccountLabel">Depuis le compte <span class="required">*</span></label>
+          <select id="goalTransferAccountSelect"></select>
         </div>
         <div class="modal-actions">
           <button type="button" id="cancelGoalTransferModalBtn" class="btn btn-secondary">Annuler</button>
@@ -758,10 +822,22 @@
           <select id="recCategorySelect" required></select>
         </div>
 
-        <div class="form-group">
-          <label for="recDayInput" class="form-label">Jour de prélèvement / versement (1 à 31) <span class="required">*</span></label>
-          <input type="number" id="recDayInput" min="1" max="31" value="1" required>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="recFrequencySelect" class="form-label">Fréquence <span class="required">*</span></label>
+            <select id="recFrequencySelect" required>
+              <option value="weekly">Hebdomadaire</option>
+              <option value="monthly" selected>Mensuelle</option>
+              <option value="quarterly">Trimestrielle</option>
+              <option value="yearly">Annuelle</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="recStartDateInput" class="form-label">Première échéance <span class="required">*</span></label>
+            <input type="date" id="recStartDateInput" required>
+          </div>
         </div>
+        <p class="form-help rec-help">Les échéances suivantes sont calculées à partir de cette date (même jour de la semaine, du mois ou de l'année). Si l'application automatique est activée, une échéance déjà passée ce mois-ci est ajoutée immédiatement.</p>
 
         <div class="modal-actions">
           <button type="button" id="cancelRecurringModalBtn" class="btn btn-secondary">Annuler</button>
@@ -771,13 +847,43 @@
     </div>
   </div>
 
+  <!-- Modale Gestion des catégories -->
+  <div id="categoriesModal" class="modal-overlay hidden" role="dialog" aria-labelledby="categoriesModalTitle" aria-modal="true">
+    <div class="modal-card modal-large">
+      <div class="modal-header">
+        <h3 id="categoriesModalTitle" class="modal-title">Gérer les catégories</h3>
+        <button type="button" id="closeCategoriesModalBtn" class="btn-close-modal" aria-label="Fermer la boîte de dialogue">&times;</button>
+      </div>
+
+      <div class="type-toggle categories-tabs" role="tablist" aria-label="Type de catégories">
+        <button type="button" id="categoriesTabExpense" class="toggle-option active" role="tab" aria-selected="true">Dépenses</button>
+        <button type="button" id="categoriesTabIncome" class="toggle-option" role="tab" aria-selected="false">Revenus</button>
+      </div>
+
+      <ul id="categoriesList" class="categories-list">
+        <!-- Généré en JS -->
+      </ul>
+
+      <form id="addCategoryForm" class="category-add-row" novalidate>
+        <input type="color" id="newCategoryColor" class="category-color-input" value="#3b82f6" aria-label="Couleur de la nouvelle catégorie">
+        <input type="text" id="newCategoryName" maxlength="40" placeholder="Nom de la nouvelle catégorie (ex. Animaux, Abonnements…)" aria-label="Nom de la nouvelle catégorie">
+        <button type="submit" class="btn btn-primary btn-sm">Ajouter</button>
+      </form>
+      <p class="form-help">Cliquez sur un nom pour le modifier : le changement est appliqué à tout l'historique, aux récurrences et aux budgets. Une catégorie supprimée est remplacée par la catégorie « par défaut ».</p>
+
+      <div class="modal-actions">
+        <button type="button" id="closeCategoriesFooterBtn" class="btn btn-secondary">Fermer</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modale Journal des versions (Changelog) -->
   <div id="changelogModal" class="modal-overlay hidden" role="dialog" aria-labelledby="changelogModalTitle" aria-modal="true">
     <div class="modal-card modal-large">
       <div class="modal-header">
         <div class="modal-title-with-badge">
           <h3 id="changelogModalTitle" class="modal-title">Journal des versions</h3>
-          <span class="version-tag">Actuelle : v4.0.0</span>
+          <span class="version-tag">Actuelle : v5.0.1</span>
         </div>
         <button type="button" id="closeChangelogModalBtn" class="btn-close-modal" aria-label="Fermer le journal des versions">&times;</button>
       </div>
@@ -835,8 +941,9 @@
       </div>
 
       <div class="footer-credits">
-        <p><strong>Budget Manager</strong> <button type="button" id="footerVersionBtn" class="footer-version-btn" title="Voir les notes de version">v4.0.0</button> — Outil de gestion financière personnelle, simple, sécurisé et 100% local.</p>
+        <p><strong>Budget Manager</strong> <button type="button" id="footerVersionBtn" class="footer-version-btn" title="Voir les notes de version">v5.0.1</button> — Outil de gestion financière personnelle, simple, sécurisé et 100% local.</p>
         <p class="legal-note">Toutes les données sont stockées exclusivement dans la mémoire locale de votre navigateur (localStorage). Aucun compte, aucun serveur, aucune collecte.</p>
+        <p class="legal-note" id="lastBackupInfo"></p>
       </div>
     </div>
   </footer>

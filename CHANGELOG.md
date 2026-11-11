@@ -4,6 +4,80 @@ Toutes les modifications notables apportées à ce projet sont documentées dans
 
 ---
 
+## [5.0.1] - 2026-11-10
+
+### 🐛 Correctifs
+- **Virements** : le badge « Virement », la flèche ➔ et les montants des virements s'affichaient sans couleur (variables CSS `--primary` / `--primary-subtle` inexistantes).
+- **Suppression de compte** : les objectifs d'épargne liés au compte supprimé étaient déliés à l'écran mais ce changement n'était pas enregistré.
+- **Import JSON** : des objectifs ou des récurrences portant le même identifiant recevaient désormais un identifiant unique (modifier ou supprimer l'un affectait aussi l'autre).
+- **Comptes** : le solde initial est arrondi au centime et le type de compte est vérifié.
+- **Filtre par compte** : la liste déroulante suit l'état de l'application (plus de désynchronisation après un import ou une suppression de compte).
+- **Formulaires** : les dates saisies (ajout et édition) sont validées au même format que les dates importées.
+
+### 📁 Fichiers modifiés
+- `index.html`, `css/style.css`, `js/app.js`, `sw.js`, `CHANGELOG.md`
+
+---
+
+## [5.0.0] - 2026-11-10
+
+### 🚀 Nouvelles fonctionnalités
+- **Prévision du solde de fin de mois** : nouvelle carte « Prévision au JJ/MM/AAAA » = solde actuel + échéances récurrentes du mois pas encore enregistrées. Alerte visuelle si un compte passe sous zéro. Suit le filtre de compte actif.
+- **Pagination de la liste des transactions** : 10 / 25 / 50 / 100 lignes par page (choix mémorisé), navigation par numéros de page, retour en page 1 à chaque changement de filtre ou de recherche.
+- **Catégories personnalisées** (bouton « Gérer les catégories ») :
+  - création de catégories de dépenses et de revenus avec couleur au choix (utilisée dans les graphiques) ;
+  - renommage répercuté sur tout l'historique, les récurrences et les plafonds budgétaires ;
+  - suppression avec réaffectation vers la catégorie par défaut (« Autre dépense » / « Autre revenu », non supprimable) ;
+  - les catégories inconnues d'un import CSV/JSON sont ajoutées automatiquement.
+- **Récurrences avancées** :
+  - fréquences hebdomadaire, mensuelle, trimestrielle et annuelle à partir d'une date de première échéance ;
+  - affichage du calendrier (« Chaque lundi », « Chaque année, le 15 mars »…), de la prochaine échéance et de l'équivalent mensuel ;
+  - **application automatique** à l'ouverture des échéances passées (interrupteur « Application auto ») ; une transaction générée puis supprimée n'est pas recréée ;
+  - détection des doublons par échéance (date d'origine mémorisée), même si la transaction est ensuite modifiée.
+- **Épargne liée aux comptes** : un objectif peut être associé à un compte. Chaque versement / retrait crée un vrai virement (ex. Compte Courant ➔ Livret A). La progression de l'objectif est calculée à partir de ces virements : supprimer un virement met l'objectif à jour.
+- **Rappel de sauvegarde** : bandeau affiché si aucun export JSON depuis 30 jours (bouton « Exporter maintenant » ou report de 7 jours) ; date de la dernière sauvegarde dans le pied de page.
+
+### ✨ Améliorations
+- Sélecteur Dépense / Revenu / Virement sur une seule ligne.
+- Icônes dans le tableau pour les transactions issues d'une récurrence (↻) ou d'un objectif d'épargne (◎).
+- L'export JSON inclut les catégories ; migration automatique des récurrences v4 (champ « jour » ➔ date de première échéance).
+
+### 📁 Fichiers modifiés
+- `index.html`, `css/style.css`, `js/app.js`, `sw.js`, `CHANGELOG.md`
+
+---
+
+## [4.1.0] - 2026-11-10
+
+### 🐛 Correctifs
+- **Statistiques** : les barres « Détail par catégorie » et les légendes des graphiques en anneau ne s'affichaient pas (classes JS ≠ classes CSS).
+- **Sécurité / intégrité des données** : validation et normalisation de toutes les données chargées et importées (montants texte qui faussaient les totaux par concaténation, dates invalides, identifiants en double, champ `day` des récurrences injecté sans échappement → faille XSS via un fichier importé).
+- **Migration v1/v2** : le solde initial des anciennes versions était ignoré et remplacé par des comptes de démonstration (+4 350 €). Il est désormais repris sur un compte unique.
+- **Données de démo** : elles n'apparaissent plus qu'à la toute première visite (plus de réinjection si une seule clé du stockage manque).
+- **Récurrences** : détection des opérations déjà appliquées via un identifiant (`recurringId`) au lieu de l'intitulé et du montant, ce qui évite les doublons après une modification.
+- **Suppression de compte** : les virements devenus « compte → même compte » sont retirés au lieu d'être redirigés vers un autre compte (ce qui faussait son solde).
+- **Réinitialisation** : les comptes repartent à 0 € (et les constantes par défaut ne sont plus modifiées par référence).
+- **Édition** : les catégories personnalisées (import CSV) sont conservées ; date obligatoire.
+- **Objectifs** : calcul de l'échéance sans décalage de fuseau horaire ; mention « Échéance dépassée ».
+- **Budgets** : message clair quand toutes les catégories ont déjà un plafond.
+- **Formulaire** : synchronisation du type sélectionné quand le navigateur restaure le formulaire au rechargement.
+- **PWA** : `respondWith` renvoie toujours une `Response`, mise en cache limitée à la même origine, tailles d'icônes correctes dans le manifeste.
+
+### ✨ Améliorations
+- Total affiché au centre des graphiques en anneau et pourcentage dans la légende.
+- Badge « ✓ Appliquée ce mois » / « en attente » sur chaque récurrence.
+- Budget : reste disponible par jour jusqu'à la fin du mois.
+- Confirmation avant un import JSON qui remplace les données ; import des sauvegardes v1/v2.
+- Export CSV compatible Excel FR (virgule décimale, échappement des champs) ; import CSV acceptant les dates `JJ/MM/AAAA`.
+- Recherche par montant au format français (`12,50`).
+- Thème système respecté par défaut, sans flash blanc au chargement.
+- Modales défilables sur petits écrans, focus clavier visible, cartes de comptes utilisables au clavier, prise en compte de `prefers-reduced-motion`.
+
+### 📁 Fichiers modifiés
+- `index.html`, `css/style.css`, `js/app.js`, `manifest.json`, `sw.js`, `CHANGELOG.md`
+
+---
+
 ## [4.0.0] - 2026-09-15
 
 ### 🚀 Nouveautés & Fonctionnalités ajoutées
