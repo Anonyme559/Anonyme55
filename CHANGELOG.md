@@ -4,6 +4,29 @@ Toutes les modifications notables apportées à ce projet sont documentées dans
 
 ---
 
+## [5.1.0] - 2026-11-13
+
+### 🚀 Nouvelles fonctionnalités
+- **Choisir un mois / période personnalisée** : deux nouvelles options dans le filtre de période.
+  - « Choisir un mois… » affiche une navigation ‹ Octobre 2026 › (+ bouton « Revenir au mois en cours ») ;
+  - « Période personnalisée… » propose deux dates « Du … au … » (bornes remises dans l'ordre si inversées) ;
+  - les plafonds budgétaires suivent le mois choisi (ou le mois dernier) ; la période affichée est rappelée dans les statistiques.
+- **Sélection multiple des transactions** : case à cocher par ligne et « tout sélectionner » (page, puis toutes les transactions filtrées). Actions groupées : changer la catégorie (appliquée aux seules transactions du type correspondant), pointer, dépointer, supprimer (avec confirmation et annulation).
+- **Pointage / rapprochement bancaire** :
+  - bouton ✓ « Pointé » sur chaque ligne et case dans la modale d'édition ;
+  - filtre « Pointées / Non pointées » ;
+  - « Solde pointé » affiché sous le solde total et sur chaque carte de compte, avec le nombre d'opérations restant à pointer ;
+  - colonne `Pointee` dans l'export / import CSV.
+- **Assistant de bienvenue** (première visite et après une réinitialisation) en 3 étapes : choix (mes données / démo / restaurer une sauvegarde), premier compte (nom, type, devise, solde actuel), apparence (thème, couleur). Les données de démonstration ne sont plus imposées. Relançable depuis les Préférences.
+- **Mode confidentialité** : bouton 👁 dans l'en-tête, qui remplace tous les montants par « •••,•• € » (mémorisé).
+- **Préférences** (bouton ⚙) : devise d'affichage (EUR, USD, GBP, CHF, CAD, XOF, XAF, MAD, TND, DZD, JPY, sans conversion des montants) et couleur d'accent (7 teintes ou couleur libre, avec contraste du texte calculé automatiquement). Ces préférences sont incluses dans l'export JSON.
+- **Notification « Nouvelle version disponible »** : le service worker attend l'accord de l'utilisateur (bouton « Mettre à jour »), puis un message « mis à jour en vX » propose de voir les nouveautés.
+
+### 📁 Fichiers modifiés
+- `index.html`, `css/style.css`, `js/app.js`, `sw.js`, `CHANGELOG.md`
+
+---
+
 ## [5.0.1] - 2026-11-10
 
 ### 🐛 Correctifs

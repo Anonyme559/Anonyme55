@@ -10,7 +10,7 @@
   // 1. Constantes & Catégories par défaut
   // ==========================================================================
 
-  const APP_VERSION = '5.0.1';
+  const APP_VERSION = '5.1.0';
 
   const STORAGE_KEY_TRANSACTIONS = 'budget_manager_transactions';
   const STORAGE_KEY_INITIAL_BALANCE = 'budget_manager_initial_balance';
@@ -39,8 +39,52 @@
   // Catégories « de repli » qui ne peuvent pas être supprimées
   const PROTECTED_CATEGORY_IDS = { expense: 'autre_depense', income: 'autre_revenu' };
 
+  // Devises proposées (affichage uniquement : aucun montant n'est converti)
+  const CURRENCIES = [
+    { code: 'EUR', label: 'Euro (€)' },
+    { code: 'USD', label: 'Dollar américain ($)' },
+    { code: 'GBP', label: 'Livre sterling (£)' },
+    { code: 'CHF', label: 'Franc suisse (CHF)' },
+    { code: 'CAD', label: 'Dollar canadien ($)' },
+    { code: 'XOF', label: 'Franc CFA – UEMOA (F CFA)' },
+    { code: 'XAF', label: 'Franc CFA – CEMAC (FCFA)' },
+    { code: 'MAD', label: 'Dirham marocain (MAD)' },
+    { code: 'TND', label: 'Dinar tunisien (TND)' },
+    { code: 'DZD', label: 'Dinar algérien (DZD)' },
+    { code: 'JPY', label: 'Yen japonais (¥)' }
+  ];
+
+  // Couleurs d'accent prédéfinies (variante pour le thème clair / sombre)
+  const ACCENT_PRESETS = [
+    { id: 'blue', label: 'Bleu', light: '#2563eb', dark: '#3b82f6' },
+    { id: 'indigo', label: 'Indigo', light: '#4f46e5', dark: '#6366f1' },
+    { id: 'violet', label: 'Violet', light: '#7c3aed', dark: '#8b5cf6' },
+    { id: 'pink', label: 'Rose', light: '#db2777', dark: '#ec4899' },
+    { id: 'orange', label: 'Orange', light: '#c2410c', dark: '#f97316' },
+    { id: 'teal', label: 'Sarcelle', light: '#0f766e', dark: '#14b8a6' },
+    { id: 'slate', label: 'Ardoise', light: '#475569', dark: '#64748b' }
+  ];
+  const DEFAULT_ACCENT_ID = 'blue';
+
+  const VALID_RECONCILED_FILTERS = ['all', 'unreconciled', 'reconciled'];
+
   // Historique des versions (Changelog officiel)
   const CHANGELOG_HISTORY = [
+    {
+      version: '5.1.0',
+      date: '2026-11-13',
+      title: 'Navigation par mois, sélection multiple, pointage, accueil & préférences',
+      changes: [
+        'Filtre « Choisir un mois » avec navigation ‹ mois précédent / suivant › et « Période personnalisée » (du … au …) ; les plafonds budgétaires suivent le mois choisi',
+        'Sélection multiple des transactions : suppression (avec annulation), changement de catégorie, pointage et dépointage groupés',
+        'Pointage / rapprochement bancaire : case « Pointé » par opération, filtre dédié et solde pointé affiché à côté du solde théorique',
+        'Assistant de bienvenue en 3 étapes pour créer son premier compte (ou explorer la démo, ou restaurer une sauvegarde)',
+        'Mode confidentialité : un bouton 👁 masque tous les montants à l\'écran',
+        'Préférences : choix de la devise d\'affichage et de la couleur d\'accent (7 teintes ou couleur libre)',
+        'Notification « Nouvelle version disponible » avec mise à jour en un clic, puis rappel des nouveautés'
+      ],
+      files: ['index.html', 'css/style.css', 'js/app.js', 'sw.js', 'CHANGELOG.md']
+    },
     {
       version: '5.0.1',
       date: '2026-11-10',
@@ -321,14 +365,26 @@
       autoApplyRecurring: true,
       lastExportAt: null,
       backupSnoozeUntil: null,
-      firstUseAt: null
+      firstUseAt: null,
+      currency: 'EUR',
+      accent: DEFAULT_ACCENT_ID,
+      accentCustom: '#2563eb',
+      privacyMode: false,
+      onboardingPending: false,
+      lastSeenVersion: null
     },
     currentPage: 1,
     categoriesModalType: 'expense',
     filterAccount: 'all',
     filterType: 'all',
     filterPeriod: 'all',
+    filterMonth: getMonthKey(),
+    filterFrom: '',
+    filterTo: '',
+    filterReconciled: 'all',
     searchQuery: '',
+    selectedTxIds: new Set(),
+    onboardingStep: 1,
     currentTheme: 'light',
     lastDeletedTx: null
   };
@@ -554,7 +610,71 @@
     toastActionBtn: document.getElementById('toastActionBtn'),
 
     // Navigation
-    navLinks: document.querySelectorAll('.nav-link')
+    navLinks: document.querySelectorAll('.nav-link'),
+
+    // Période : mois précis & période personnalisée
+    periodMonthBar: document.getElementById('periodMonthBar'),
+    periodMonthLabel: document.getElementById('periodMonthLabel'),
+    prevMonthBtn: document.getElementById('prevMonthBtn'),
+    nextMonthBtn: document.getElementById('nextMonthBtn'),
+    currentMonthBtn: document.getElementById('currentMonthBtn'),
+    periodCustomBar: document.getElementById('periodCustomBar'),
+    filterFromInput: document.getElementById('filterFrom'),
+    filterToInput: document.getElementById('filterTo'),
+    statsPeriodLabel: document.getElementById('statsPeriodLabel'),
+    budgetsTitle: document.getElementById('budgets-title'),
+    budgetAllocatedLabel: document.getElementById('budgetAllocatedLabel'),
+
+    // Sélection multiple & pointage
+    filterReconciledSelect: document.getElementById('filterReconciled'),
+    selectAllTxCheckbox: document.getElementById('selectAllTx'),
+    bulkActionsBar: document.getElementById('bulkActionsBar'),
+    bulkCount: document.getElementById('bulkCount'),
+    bulkSelectAllFilteredBtn: document.getElementById('bulkSelectAllFilteredBtn'),
+    bulkCategorySelect: document.getElementById('bulkCategorySelect'),
+    bulkReconcileBtn: document.getElementById('bulkReconcileBtn'),
+    bulkUnreconcileBtn: document.getElementById('bulkUnreconcileBtn'),
+    bulkDeleteBtn: document.getElementById('bulkDeleteBtn'),
+    bulkClearBtn: document.getElementById('bulkClearBtn'),
+    reconciledBalanceInfo: document.getElementById('reconciledBalanceInfo'),
+    editTxReconciled: document.getElementById('editTxReconciled'),
+
+    // Mode confidentialité & préférences
+    privacyToggleBtn: document.getElementById('privacyToggleBtn'),
+    iconEyeOpen: document.querySelector('.icon-eye-open'),
+    iconEyeClosed: document.querySelector('.icon-eye-closed'),
+    settingsBtn: document.getElementById('settingsBtn'),
+    settingsModal: document.getElementById('settingsModal'),
+    closeSettingsModalBtn: document.getElementById('closeSettingsModalBtn'),
+    closeSettingsFooterBtn: document.getElementById('closeSettingsFooterBtn'),
+    settingsCurrencySelect: document.getElementById('settingsCurrencySelect'),
+    settingsAccentSwatches: document.getElementById('settingsAccentSwatches'),
+    settingsPrivacyToggle: document.getElementById('settingsPrivacyToggle'),
+    settingsOnboardingBtn: document.getElementById('settingsOnboardingBtn'),
+
+    // Assistant de bienvenue
+    onboardingModal: document.getElementById('onboardingModal'),
+    onboardingStepLabel: document.getElementById('onboardingStepLabel'),
+    onboardingSteps: document.querySelectorAll('.onboarding-step'),
+    onboardingDots: document.querySelectorAll('.onboarding-dot'),
+    onboardingSkipBtn: document.getElementById('onboardingSkipBtn'),
+    onboardingStartBtn: document.getElementById('onboardingStartBtn'),
+    onboardingDemoBtn: document.getElementById('onboardingDemoBtn'),
+    onboardingImportInput: document.getElementById('onboardingImportInput'),
+    onboardingAccountForm: document.getElementById('onboardingAccountForm'),
+    onboardingAccountName: document.getElementById('onboardingAccountName'),
+    onboardingAccountType: document.getElementById('onboardingAccountType'),
+    onboardingAccountBalance: document.getElementById('onboardingAccountBalance'),
+    onboardingCurrencySelect: document.getElementById('onboardingCurrencySelect'),
+    onboardingAccentSwatches: document.getElementById('onboardingAccentSwatches'),
+    onboardingThemeLight: document.getElementById('onboardingThemeLight'),
+    onboardingThemeDark: document.getElementById('onboardingThemeDark'),
+    onboardingFinishBtn: document.getElementById('onboardingFinishBtn'),
+
+    // Mise à jour de l'application (Service Worker)
+    updateBanner: document.getElementById('updateBanner'),
+    updateNowBtn: document.getElementById('updateNowBtn'),
+    updateLaterBtn: document.getElementById('updateLaterBtn')
   };
 
   let toastTimeoutId = null;
@@ -563,19 +683,58 @@
   // 4. Utilitaires de formatage et dates
   // ==========================================================================
 
+  let currencyFormatter = null;
+
+  /** Formateur monétaire de la devise choisie (mis en cache, réinitialisé au changement de devise) */
+  function getCurrencyFormatter() {
+    if (currencyFormatter) return currencyFormatter;
+    const currency = state.settings.currency || 'EUR';
+    const attempts = [
+      { style: 'currency', currency, currencyDisplay: 'narrowSymbol' },
+      { style: 'currency', currency },
+      { style: 'currency', currency: 'EUR' }
+    ];
+    for (const options of attempts) {
+      try {
+        currencyFormatter = new Intl.NumberFormat('fr-FR', options);
+        return currencyFormatter;
+      } catch (e) { /* option non supportée par ce navigateur : essai suivant */ }
+    }
+    return currencyFormatter;
+  }
+
+  /** Symbole de la devise d'affichage (ex. « € », « $ », « CHF ») */
+  function getCurrencySymbol() {
+    const part = getCurrencyFormatter().formatToParts(0).find(p => p.type === 'currency');
+    return part ? part.value : '€';
+  }
+
   /**
-   * Formate un nombre en montant monétaire avec la devise €
+   * Formate un nombre en montant monétaire dans la devise choisie.
+   * En mode confidentialité, les chiffres sont remplacés par « ••• ».
    * @param {number} amount
    * @returns {string}
    */
   function formatCurrency(amount) {
     const validAmount = Number.isFinite(amount) ? amount : 0;
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(validAmount);
+    const formatter = getCurrencyFormatter();
+    if (!state.settings.privacyMode) return formatter.format(validAmount);
+
+    let digitsMasked = false;
+    return formatter.formatToParts(validAmount).map(part => {
+      switch (part.type) {
+        case 'integer':
+          if (digitsMasked) return '';
+          digitsMasked = true;
+          return '•••';
+        case 'fraction': return '••';
+        case 'group':
+        case 'minusSign':
+        case 'plusSign':
+          return '';
+        default: return part.value;
+      }
+    }).join('');
   }
 
   /**
@@ -805,6 +964,8 @@
         item.goalId = sanitizeText(tx.goalId, 80);
         item.goalAction = tx.goalAction === 'withdraw' ? 'withdraw' : 'deposit';
       }
+      // Pointage (rapprochement bancaire)
+      if (tx.reconciled === true) item.reconciled = true;
       result.push(item);
     });
     return result;
@@ -925,7 +1086,13 @@
       autoApplyRecurring: s.autoApplyRecurring !== false,
       lastExportAt: num(s.lastExportAt),
       backupSnoozeUntil: num(s.backupSnoozeUntil),
-      firstUseAt: num(s.firstUseAt)
+      firstUseAt: num(s.firstUseAt),
+      currency: CURRENCIES.some(c => c.code === s.currency) ? s.currency : 'EUR',
+      accent: s.accent === 'custom' || ACCENT_PRESETS.some(a => a.id === s.accent) ? s.accent : DEFAULT_ACCENT_ID,
+      accentCustom: isValidHexColor(s.accentCustom) ? s.accentCustom.toLowerCase() : '#2563eb',
+      privacyMode: s.privacyMode === true,
+      onboardingPending: s.onboardingPending === true,
+      lastSeenVersion: typeof s.lastSeenVersion === 'string' ? s.lastSeenVersion.slice(0, 20) : null
     };
   }
 
@@ -1059,6 +1226,45 @@
    */
   function getMonthKey(date = new Date()) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  /** Décale une clé de mois "YYYY-MM" de N mois */
+  function shiftMonthKey(monthKey, delta) {
+    const [y, m] = monthKey.split('-').map(Number);
+    return getMonthKey(new Date(y, m - 1 + delta, 1));
+  }
+
+  /** "2026-11" ➔ "Novembre 2026" */
+  function formatMonthLabel(monthKey) {
+    const [y, m] = monthKey.split('-').map(Number);
+    const label = new Date(y, m - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+
+  /** Libellé lisible de la période filtrée (statistiques) */
+  function getPeriodLabel() {
+    switch (state.filterPeriod) {
+      case 'this-month': return formatMonthLabel(getMonthKey());
+      case 'last-month': return formatMonthLabel(shiftMonthKey(getMonthKey(), -1));
+      case 'this-year': return `Année ${new Date().getFullYear()}`;
+      case 'month': return formatMonthLabel(state.filterMonth);
+      case 'custom': {
+        const { from, to } = getCustomRange();
+        if (from && to) return `Du ${formatDateFr(from)} au ${formatDateFr(to)}`;
+        if (from) return `Depuis le ${formatDateFr(from)}`;
+        if (to) return `Jusqu'au ${formatDateFr(to)}`;
+        return 'Toutes les périodes';
+      }
+      default: return 'Toutes les périodes';
+    }
+  }
+
+  /** Bornes de la période personnalisée, remises dans l'ordre si inversées */
+  function getCustomRange() {
+    let from = state.filterFrom;
+    let to = state.filterTo;
+    if (from && to && from > to) [from, to] = [to, from];
+    return { from, to };
   }
 
   // ==========================================================================
@@ -1262,8 +1468,6 @@
   function applyTheme(theme, persist = true) {
     state.currentTheme = theme;
     document.documentElement.setAttribute('data-theme', theme);
-    const themeMeta = document.querySelector('meta[name="theme-color"]');
-    if (themeMeta) themeMeta.setAttribute('content', theme === 'dark' ? '#151c2c' : '#2563eb');
 
     if (theme === 'dark') {
       if (dom.iconSun) dom.iconSun.classList.add('hidden');
@@ -1272,12 +1476,196 @@
       if (dom.iconSun) dom.iconSun.classList.remove('hidden');
       if (dom.iconMoon) dom.iconMoon.classList.add('hidden');
     }
+    // Les variantes de la couleur d'accent dépendent du thème
+    applyAccent();
+    syncOnboardingThemeButtons();
     if (persist) saveThemeToStorage(theme);
   }
 
   function toggleTheme() {
     const nextTheme = state.currentTheme === 'dark' ? 'light' : 'dark';
     applyTheme(nextTheme);
+  }
+
+  // ==========================================================================
+  // 6 bis. Couleur d'accent, devise & mode confidentialité
+  // ==========================================================================
+
+  function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+
+  function rgbToHex(rgb) {
+    return '#' + rgb.map(v => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join('');
+  }
+
+  /** Mélange deux couleurs hexadécimales (ratio = part de la seconde couleur) */
+  function mixHex(hexA, hexB, ratio) {
+    const a = hexToRgb(hexA);
+    const b = hexToRgb(hexB);
+    return rgbToHex(a.map((v, i) => v + (b[i] - v) * ratio));
+  }
+
+  function relativeLuminance(hex) {
+    const [r, g, b] = hexToRgb(hex).map(v => {
+      const c = v / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  /** Couleur d'accent effective pour le thème courant */
+  function getAccentColor(theme = state.currentTheme) {
+    if (state.settings.accent === 'custom') return state.settings.accentCustom;
+    const preset = ACCENT_PRESETS.find(a => a.id === state.settings.accent) || ACCENT_PRESETS[0];
+    return theme === 'dark' ? preset.dark : preset.light;
+  }
+
+  const ACCENT_CSS_VARS = ['--primary-color', '--primary-hover', '--primary-light', '--primary-rgb', '--on-primary', '--border-focus'];
+
+  /**
+   * Applique la couleur d'accent sous forme de variables CSS.
+   * La couleur par défaut (bleu) laisse la feuille de style s'appliquer telle quelle.
+   */
+  function applyAccent() {
+    const root = document.documentElement;
+    const isDark = state.currentTheme === 'dark';
+    const color = getAccentColor();
+
+    if (state.settings.accent === DEFAULT_ACCENT_ID) {
+      ACCENT_CSS_VARS.forEach(v => root.style.removeProperty(v));
+    } else {
+      // Texte blanc sur l'accent si le contraste est suffisant, sinon texte foncé
+      const contrastWithWhite = 1.05 / (relativeLuminance(color) + 0.05);
+      root.style.setProperty('--primary-color', color);
+      root.style.setProperty('--primary-hover', isDark ? mixHex(color, '#ffffff', 0.2) : mixHex(color, '#000000', 0.15));
+      root.style.setProperty('--primary-light', isDark ? mixHex(color, '#0b0f19', 0.78) : mixHex(color, '#ffffff', 0.9));
+      root.style.setProperty('--primary-rgb', hexToRgb(color).join(', '));
+      root.style.setProperty('--on-primary', contrastWithWhite >= 3 ? '#ffffff' : '#0f172a');
+      root.style.setProperty('--border-focus', color);
+    }
+
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.setAttribute('content', isDark ? '#151c2c' : getAccentColor('light'));
+  }
+
+  function setAccent(accentId, customColor) {
+    if (accentId === 'custom') {
+      if (!isValidHexColor(customColor)) return;
+      state.settings.accentCustom = customColor.toLowerCase();
+      state.settings.accent = 'custom';
+    } else if (ACCENT_PRESETS.some(a => a.id === accentId)) {
+      state.settings.accent = accentId;
+    } else {
+      return;
+    }
+    saveSettingsToStorage();
+    applyAccent();
+    renderAllAccentSwatches();
+  }
+
+  /** Pastilles de choix de la couleur d'accent (préférences et assistant de bienvenue) */
+  function renderAccentSwatches(container) {
+    if (!container) return;
+    const current = state.settings.accent;
+    const presetsHtml = ACCENT_PRESETS.map(a => `
+      <button type="button" class="accent-swatch ${current === a.id ? 'active' : ''}" data-accent="${a.id}"
+        style="--swatch: ${a.light}" role="radio" aria-checked="${current === a.id}" title="${escapeHtml(a.label)}" aria-label="${escapeHtml(a.label)}"></button>
+    `).join('');
+    container.innerHTML = `
+      ${presetsHtml}
+      <label class="accent-swatch accent-swatch-custom ${current === 'custom' ? 'active' : ''}" style="--swatch: ${state.settings.accentCustom}" title="Couleur personnalisée">
+        <input type="color" class="accent-custom-input" value="${state.settings.accentCustom}" aria-label="Couleur personnalisée">
+        <span aria-hidden="true">+</span>
+      </label>
+    `;
+  }
+
+  function renderAllAccentSwatches() {
+    renderAccentSwatches(dom.settingsAccentSwatches);
+    renderAccentSwatches(dom.onboardingAccentSwatches);
+  }
+
+  /** Écouteurs communs aux deux grilles de pastilles */
+  function bindAccentSwatches(container) {
+    if (!container) return;
+    container.addEventListener('click', (e) => {
+      const btn = e.target.closest('.accent-swatch[data-accent]');
+      if (btn) setAccent(btn.getAttribute('data-accent'));
+    });
+    container.addEventListener('change', (e) => {
+      if (e.target.classList.contains('accent-custom-input')) setAccent('custom', e.target.value);
+    });
+  }
+
+  function populateCurrencySelect(selectElement) {
+    if (!selectElement) return;
+    selectElement.innerHTML = CURRENCIES.map(c => `
+      <option value="${c.code}" ${c.code === state.settings.currency ? 'selected' : ''}>${escapeHtml(c.label)}</option>
+    `).join('');
+  }
+
+  /** Met à jour tous les symboles monétaires statiques (libellés et champs de saisie) */
+  function updateCurrencyLabels() {
+    const symbol = getCurrencySymbol();
+    document.querySelectorAll('.currency-symbol, .cur-sym').forEach(el => {
+      el.textContent = symbol;
+    });
+  }
+
+  function setCurrency(code) {
+    if (!CURRENCIES.some(c => c.code === code) || code === state.settings.currency) return;
+    state.settings.currency = code;
+    currencyFormatter = null;
+    saveSettingsToStorage();
+    populateCurrencySelect(dom.settingsCurrencySelect);
+    populateCurrencySelect(dom.onboardingCurrencySelect);
+    updateCurrencyLabels();
+    updateUI();
+  }
+
+  function applyPrivacyUi() {
+    const on = state.settings.privacyMode;
+    document.documentElement.classList.toggle('privacy-on', on);
+    if (dom.privacyToggleBtn) {
+      dom.privacyToggleBtn.setAttribute('aria-pressed', String(on));
+      const label = on ? 'Afficher les montants' : 'Masquer les montants (mode confidentialité)';
+      dom.privacyToggleBtn.setAttribute('title', label);
+      dom.privacyToggleBtn.setAttribute('aria-label', label);
+    }
+    if (dom.iconEyeOpen) dom.iconEyeOpen.classList.toggle('hidden', on);
+    if (dom.iconEyeClosed) dom.iconEyeClosed.classList.toggle('hidden', !on);
+    if (dom.settingsPrivacyToggle) dom.settingsPrivacyToggle.checked = on;
+  }
+
+  function setPrivacyMode(enabled) {
+    state.settings.privacyMode = !!enabled;
+    saveSettingsToStorage();
+    applyPrivacyUi();
+    updateUI();
+    showToast(enabled ? 'Mode confidentialité activé : les montants sont masqués' : 'Montants de nouveau visibles');
+  }
+
+  // ==========================================================================
+  // 6 ter. Modale Préférences
+  // ==========================================================================
+
+  function openSettingsModal() {
+    if (!dom.settingsModal) return;
+    populateCurrencySelect(dom.settingsCurrencySelect);
+    renderAccentSwatches(dom.settingsAccentSwatches);
+    applyPrivacyUi();
+    dom.settingsModal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    if (dom.settingsCurrencySelect) dom.settingsCurrencySelect.focus();
+  }
+
+  function closeSettingsModal() {
+    if (dom.settingsModal && !dom.settingsModal.classList.contains('hidden')) {
+      dom.settingsModal.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
   }
 
   // ==========================================================================
@@ -1343,24 +1731,38 @@
     }
   }
 
-  function calculateAccountBalance(accountId) {
+  /**
+   * Effet d'une transaction sur le solde d'un compte (0 si elle ne le concerne pas)
+   */
+  function getTxEffectOnAccount(tx, accountId) {
+    if (tx.type === 'income') return tx.accountId === accountId ? tx.amount : 0;
+    if (tx.type === 'expense') return tx.accountId === accountId ? -tx.amount : 0;
+    if (tx.type === 'transfer') {
+      let effect = 0;
+      if (tx.toAccountId === accountId) effect += tx.amount;
+      if (tx.accountId === accountId) effect -= tx.amount;
+      return effect;
+    }
+    return 0;
+  }
+
+  /**
+   * Solde d'un compte = solde initial + flux.
+   * @param {string} accountId
+   * @param {boolean} onlyReconciled true = solde « pointé » (seules les opérations vérifiées sur le relevé)
+   */
+  function calculateAccountBalance(accountId, onlyReconciled = false) {
     const acc = getAccountById(accountId);
     if (!acc) return 0;
-    const initial = Number(acc.initialBalance) || 0;
-    const income = state.transactions
-      .filter(t => t.type === 'income' && t.accountId === accountId)
-      .reduce((sum, t) => sum + t.amount, 0);
-    const expense = state.transactions
-      .filter(t => t.type === 'expense' && t.accountId === accountId)
-      .reduce((sum, t) => sum + t.amount, 0);
-    const transfersIn = state.transactions
-      .filter(t => t.type === 'transfer' && t.toAccountId === accountId)
-      .reduce((sum, t) => sum + t.amount, 0);
-    const transfersOut = state.transactions
-      .filter(t => t.type === 'transfer' && t.accountId === accountId)
-      .reduce((sum, t) => sum + t.amount, 0);
+    return state.transactions.reduce((sum, t) => {
+      if (onlyReconciled && !t.reconciled) return sum;
+      return sum + getTxEffectOnAccount(t, accountId);
+    }, Number(acc.initialBalance) || 0);
+  }
 
-    return initial + income - expense + transfersIn - transfersOut;
+  function hasReconciledTransactions(accountId = 'all') {
+    return state.transactions.some(t => t.reconciled && (accountId === 'all' ||
+      t.accountId === accountId || (t.type === 'transfer' && t.toAccountId === accountId)));
   }
 
   function calculateTotalWealth() {
@@ -1407,6 +1809,11 @@
           <div class="account-card-balance ${balance >= 0 ? 'income-text' : 'expense-text'}">
             ${formatCurrency(balance)}
           </div>
+          ${hasReconciledTransactions(acc.id) ? `
+            <div class="account-card-reconciled" title="Solde en ne comptant que les opérations pointées sur le relevé">
+              ✓ Pointé : ${formatCurrency(calculateAccountBalance(acc.id, true))}
+            </div>
+          ` : ''}
           <div class="account-card-footer">
             <span>${txCount} opération(s)</span>
             <div class="account-card-actions">
@@ -2720,16 +3127,21 @@
   // 12. Module Budgets Mensuels
   // ==========================================================================
 
-  function getMonthlyExpenseByCategory() {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
+  /**
+   * Mois suivi par les plafonds budgétaires : le mois choisi dans le filtre
+   * « Choisir un mois » (ou le mois dernier), sinon le mois en cours.
+   */
+  function getBudgetMonthKey() {
+    if (state.filterPeriod === 'month' && state.filterMonth) return state.filterMonth;
+    if (state.filterPeriod === 'last-month') return shiftMonthKey(getMonthKey(), -1);
+    return getMonthKey();
+  }
 
+  function getMonthlyExpenseByCategory(monthKey = getMonthKey()) {
     const currentMonthExpenses = state.transactions.filter(t => {
       if (t.type !== 'expense' || !t.date) return false;
       if (state.filterAccount !== 'all' && t.accountId !== state.filterAccount) return false;
-      const parts = parseDateParts(t.date);
-      return parts.year === currentYear && parts.month === currentMonth;
+      return t.date.slice(0, 7) === monthKey;
     });
 
     const expenseMap = {};
@@ -2741,6 +3153,17 @@
 
   function renderBudgets() {
     if (!dom.budgetsGrid) return;
+
+    const monthKey = getBudgetMonthKey();
+    const isCurrentMonth = monthKey === getMonthKey();
+    if (dom.budgetsTitle) {
+      dom.budgetsTitle.textContent = isCurrentMonth
+        ? 'Plafonds budgétaires du mois'
+        : `Plafonds budgétaires — ${formatMonthLabel(monthKey)}`;
+    }
+    if (dom.budgetAllocatedLabel) {
+      dom.budgetAllocatedLabel.textContent = isCurrentMonth ? 'Budget alloué (ce mois)' : `Budget alloué (${formatMonthLabel(monthKey).toLowerCase()})`;
+    }
 
     const budgetEntries = Object.entries(state.budgets);
     if (budgetEntries.length === 0) {
@@ -2754,11 +3177,11 @@
 
     if (dom.emptyBudgets) dom.emptyBudgets.classList.add('hidden');
 
-    const spentMap = getMonthlyExpenseByCategory();
+    const spentMap = getMonthlyExpenseByCategory(monthKey);
     let totalAllocated = 0;
     let totalSpent = 0;
 
-    // Jours restants dans le mois (aujourd'hui inclus) pour le reste quotidien
+    // Jours restants dans le mois (aujourd'hui inclus) pour le reste quotidien (mois en cours uniquement)
     const today = new Date();
     const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
     const daysLeft = daysInMonth - today.getDate() + 1;
@@ -2803,7 +3226,7 @@
           </div>
           <div class="budget-card-footer">
             <span>${remaining >= 0
-              ? `Reste : <strong>${formatCurrency(remaining)}</strong> <span class="budget-daily-hint">≈ ${formatCurrency(remaining / daysLeft)} / jour</span>`
+              ? `Reste : <strong>${formatCurrency(remaining)}</strong>${isCurrentMonth ? ` <span class="budget-daily-hint">≈ ${formatCurrency(remaining / daysLeft)} / jour</span>` : ''}`
               : `Excès : <strong style="color:var(--expense-color);">${formatCurrency(Math.abs(remaining))}</strong>`}</span>
             <div class="budget-actions">
               <button type="button" class="btn-edit-icon edit-budget-btn" data-category="${escapeHtml(category)}" title="Modifier le plafond" aria-label="Modifier le plafond">
@@ -2883,7 +3306,7 @@
       return;
     }
     if (isNaN(limit) || limit <= 0) {
-      showToast('Veuillez spécifier un plafond supérieur à 0 €');
+      showToast(`Veuillez spécifier un plafond supérieur à 0 ${getCurrencySymbol()}`);
       return;
     }
 
@@ -2954,13 +3377,26 @@
 
     const currentBalance = initial + totalIncome - totalExpense + transfersIn - transfersOut;
 
+    // Solde pointé : solde initial + opérations vérifiées sur le relevé uniquement
+    // (les virements internes s'annulent dans la vue « tous les comptes »)
+    const reconciledBalance = state.transactions.reduce((sum, tx) => {
+      if (!tx.reconciled) return sum;
+      if (state.filterAccount === 'all') {
+        if (tx.type === 'income') return sum + tx.amount;
+        if (tx.type === 'expense') return sum - tx.amount;
+        return sum;
+      }
+      return sum + getTxEffectOnAccount(tx, state.filterAccount);
+    }, initial);
+
     return {
       initialBalance: initial,
       totalIncome,
       incomeCount,
       totalExpense,
       expenseCount,
-      currentBalance
+      currentBalance,
+      reconciledBalance
     };
   }
 
@@ -2978,6 +3414,19 @@
       dom.balanceSubtext.textContent = `Solde initial cumulé : ${formatCurrency(summary.initialBalance)}${accText}`;
     }
 
+    if (dom.reconciledBalanceInfo) {
+      const show = hasReconciledTransactions(state.filterAccount);
+      dom.reconciledBalanceInfo.classList.toggle('hidden', !show);
+      if (show) {
+        const gap = summary.currentBalance - summary.reconciledBalance;
+        const pendingCount = state.transactions.filter(t => !t.reconciled && isTxInAccountScope(t, state.filterAccount)).length;
+        const gapText = pendingCount === 0
+          ? 'tout est pointé'
+          : `${pendingCount} opération(s) non pointée(s)${Math.abs(gap) >= 0.005 ? ` (${gap > 0 ? '+' : '-'}${formatCurrency(Math.abs(gap))})` : ''}`;
+        dom.reconciledBalanceInfo.textContent = `✓ Solde pointé : ${formatCurrency(summary.reconciledBalance)} · ${gapText}`;
+      }
+    }
+
     if (dom.quickIncomeDisplay) dom.quickIncomeDisplay.textContent = `+${formatCurrency(summary.totalIncome)}`;
     if (dom.quickIncomeCount) dom.quickIncomeCount.textContent = `${summary.incomeCount} opération(s)`;
     if (dom.quickExpenseDisplay) dom.quickExpenseDisplay.textContent = `-${formatCurrency(summary.totalExpense)}`;
@@ -2988,25 +3437,31 @@
   // 14. Tableau & Filtrage des Transactions
   // ==========================================================================
 
+  /** La transaction concerne-t-elle le compte filtré ? ('all' = tous) */
+  function isTxInAccountScope(tx, accountId) {
+    if (accountId === 'all') return true;
+    if (tx.type === 'transfer') return tx.accountId === accountId || tx.toAccountId === accountId;
+    return tx.accountId === accountId;
+  }
+
   function getFilteredTransactions() {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
+    const customRange = getCustomRange();
 
     return state.transactions.filter(tx => {
       // Filtre Compte
-      if (state.filterAccount !== 'all') {
-        if (tx.type === 'transfer') {
-          if (tx.accountId !== state.filterAccount && tx.toAccountId !== state.filterAccount) return false;
-        } else if (tx.accountId !== state.filterAccount) {
-          return false;
-        }
-      }
+      if (!isTxInAccountScope(tx, state.filterAccount)) return false;
 
       // Filtre Type
       if (state.filterType !== 'all' && tx.type !== state.filterType) {
         return false;
       }
+
+      // Filtre Pointage
+      if (state.filterReconciled === 'reconciled' && !tx.reconciled) return false;
+      if (state.filterReconciled === 'unreconciled' && tx.reconciled) return false;
 
       // Filtre Période
       if (state.filterPeriod !== 'all' && tx.date) {
@@ -3022,6 +3477,11 @@
           if (txYear !== prevYear || txMonth !== prevMonth) return false;
         } else if (state.filterPeriod === 'this-year') {
           if (txYear !== currentYear) return false;
+        } else if (state.filterPeriod === 'month') {
+          if (tx.date.slice(0, 7) !== state.filterMonth) return false;
+        } else if (state.filterPeriod === 'custom') {
+          if (customRange.from && tx.date < customRange.from) return false;
+          if (customRange.to && tx.date > customRange.to) return false;
         }
       }
 
@@ -3113,10 +3573,17 @@
 
     if (!dom.transactionsTableBody) return;
 
+    // La sélection ne garde que des transactions existantes
+    if (state.selectedTxIds.size > 0) {
+      const existing = new Set(state.transactions.map(t => t.id));
+      state.selectedTxIds.forEach(id => { if (!existing.has(id)) state.selectedTxIds.delete(id); });
+    }
+
     if (filtered.length === 0) {
       dom.transactionsTableBody.innerHTML = '';
       if (dom.emptyState) dom.emptyState.classList.remove('hidden');
       renderPagination(0, 1, 1);
+      renderSelectionUi([], 0);
       return;
     }
 
@@ -3166,14 +3633,26 @@
         }
       }
 
+      const isSelected = state.selectedTxIds.has(tx.id);
+      const dateLabel = formatDateFr(tx.date);
+
       return `
-        <tr data-id="${escapeHtml(tx.id)}">
+        <tr data-id="${escapeHtml(tx.id)}" class="${isSelected ? 'is-selected' : ''} ${tx.reconciled ? 'is-reconciled' : ''}">
+          <td class="cell-select">
+            <input type="checkbox" class="tx-select-checkbox" data-id="${escapeHtml(tx.id)}" ${isSelected ? 'checked' : ''}
+              aria-label="Sélectionner : ${escapeHtml(typeLabel)} du ${dateLabel}${tx.description ? ' — ' + escapeHtml(tx.description) : ''}">
+          </td>
           <td><span class="badge ${badgeClass}">${typeLabel}</span></td>
           <td class="cell-amount ${amountClass}">${amountPrefix}${formatCurrency(tx.amount)}</td>
           <td>${accountHtml}</td>
           <td class="cell-category">${escapeHtml(tx.category || (tx.type === 'transfer' ? 'Virement interne' : ''))}</td>
           <td class="cell-desc" title="${escapeHtml(tx.description || '')}">${tx.recurringId ? '<span class="tx-tag" title="Générée par une opération récurrente" aria-label="Récurrente">↻</span>' : ''}${tx.goalId ? '<span class="tx-tag" title="Versement / retrait d\'un objectif d\'épargne" aria-label="Épargne">◎</span>' : ''}${escapeHtml(tx.description || '—')}</td>
-          <td class="cell-date">${formatDateFr(tx.date)}</td>
+          <td class="cell-date">${dateLabel}</td>
+          <td class="cell-reconcile">
+            <button type="button" class="reconcile-btn ${tx.reconciled ? 'is-on' : ''}" data-id="${escapeHtml(tx.id)}" aria-pressed="${tx.reconciled ? 'true' : 'false'}"
+              title="${tx.reconciled ? 'Pointée sur le relevé — cliquer pour dépointer' : 'Non pointée — cliquer pour pointer (vérifiée sur le relevé)'}"
+              aria-label="${tx.reconciled ? 'Dépointer la transaction' : 'Pointer la transaction'}">✓</button>
+          </td>
           <td class="text-right">
             <div class="table-actions">
               <button type="button" class="btn-edit-icon edit-tx-btn" data-id="${escapeHtml(tx.id)}" title="Modifier la transaction" aria-label="Modifier la transaction">
@@ -3193,6 +3672,198 @@
         </tr>
       `;
     }).join('');
+
+    renderSelectionUi(pageItems, filtered.length);
+  }
+
+  // ==========================================================================
+  // 14 bis. Sélection multiple, actions groupées & pointage
+  // ==========================================================================
+
+  /** Case « tout sélectionner » de la page + barre d'actions groupées */
+  function renderSelectionUi(pageItems, filteredCount) {
+    const selectedCount = state.selectedTxIds.size;
+
+    if (dom.selectAllTxCheckbox) {
+      const pageSelected = pageItems.filter(t => state.selectedTxIds.has(t.id)).length;
+      dom.selectAllTxCheckbox.disabled = pageItems.length === 0;
+      dom.selectAllTxCheckbox.checked = pageItems.length > 0 && pageSelected === pageItems.length;
+      dom.selectAllTxCheckbox.indeterminate = pageSelected > 0 && pageSelected < pageItems.length;
+    }
+
+    if (!dom.bulkActionsBar) return;
+    dom.bulkActionsBar.classList.toggle('hidden', selectedCount === 0);
+    if (selectedCount === 0) return;
+
+    if (dom.bulkCount) {
+      dom.bulkCount.textContent = `${selectedCount} transaction${selectedCount > 1 ? 's' : ''} sélectionnée${selectedCount > 1 ? 's' : ''}`;
+    }
+    if (dom.bulkSelectAllFilteredBtn) {
+      const filteredIds = getFilteredTransactions().map(t => t.id);
+      const allFilteredSelected = filteredIds.every(id => state.selectedTxIds.has(id));
+      dom.bulkSelectAllFilteredBtn.classList.toggle('hidden', allFilteredSelected || filteredCount <= pageItems.length);
+      dom.bulkSelectAllFilteredBtn.textContent = `Sélectionner les ${filteredCount} transactions filtrées`;
+    }
+    populateBulkCategorySelect();
+  }
+
+  function populateBulkCategorySelect() {
+    if (!dom.bulkCategorySelect) return;
+    const group = (type, title) => `
+      <optgroup label="${title}">
+        ${getCategoryList(type).map((c, i) => `<option value="${type}:${i}">${escapeHtml(c.label)}</option>`).join('')}
+      </optgroup>
+    `;
+    dom.bulkCategorySelect.innerHTML = `
+      <option value="">Changer la catégorie…</option>
+      ${group('expense', 'Dépenses')}
+      ${group('income', 'Revenus')}
+    `;
+  }
+
+  function clearSelection() {
+    state.selectedTxIds.clear();
+  }
+
+  function getSelectedTransactions() {
+    return state.transactions.filter(t => state.selectedTxIds.has(t.id));
+  }
+
+  function toggleTxSelection(id, selected) {
+    if (selected) state.selectedTxIds.add(id);
+    else state.selectedTxIds.delete(id);
+    renderTransactionsTable();
+  }
+
+  function setPageSelection(selected) {
+    const filtered = getFilteredTransactions()
+      .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
+    const pageSize = state.settings.pageSize;
+    const start = (state.currentPage - 1) * pageSize;
+    filtered.slice(start, start + pageSize).forEach(t => {
+      if (selected) state.selectedTxIds.add(t.id);
+      else state.selectedTxIds.delete(t.id);
+    });
+    renderTransactionsTable();
+  }
+
+  function selectAllFiltered() {
+    getFilteredTransactions().forEach(t => state.selectedTxIds.add(t.id));
+    renderTransactionsTable();
+  }
+
+  function bulkDeleteSelected() {
+    const count = state.selectedTxIds.size;
+    if (count === 0) return;
+    if (count > 1 && !window.confirm(`Supprimer les ${count} transactions sélectionnées ?`)) return;
+
+    const removed = [];
+    state.transactions = state.transactions.filter((t, index) => {
+      if (state.selectedTxIds.has(t.id)) {
+        removed.push({ index, tx: t });
+        return false;
+      }
+      return true;
+    });
+    clearSelection();
+    saveTransactionsToStorage();
+    updateUI();
+
+    showToast(`${count} transaction(s) supprimée(s)`, 'Annuler', () => {
+      // Réinsertion aux positions d'origine (ordre croissant)
+      removed.forEach(({ index, tx }) => state.transactions.splice(Math.min(index, state.transactions.length), 0, tx));
+      saveTransactionsToStorage();
+      updateUI();
+      showToast('Suppression annulée');
+    });
+  }
+
+  function bulkChangeCategory(value) {
+    const [type, indexStr] = String(value).split(':');
+    const cat = getCategoryList(type)[parseInt(indexStr, 10)];
+    if (!cat) return;
+
+    let changed = 0;
+    let skipped = 0;
+    getSelectedTransactions().forEach(t => {
+      if (t.type === type) {
+        t.category = cat.label;
+        changed++;
+      } else {
+        skipped++;
+      }
+    });
+
+    if (changed > 0) {
+      saveTransactionsToStorage();
+      updateUI();
+    } else {
+      renderTransactionsTable();
+    }
+    const typeWord = type === 'income' ? 'revenus' : 'dépenses';
+    const onlyNote = type === 'income' ? 'seuls les revenus sont concernés' : 'seules les dépenses sont concernées';
+    showToast(changed > 0
+      ? `Catégorie « ${cat.label} » appliquée à ${changed} transaction(s)${skipped ? ` — ${skipped} ignorée(s) (${onlyNote})` : ''}`
+      : `Aucune modification : la catégorie « ${cat.label} » ne s'applique qu'aux ${typeWord}`);
+  }
+
+  function bulkSetReconciled(reconciled) {
+    let changed = 0;
+    getSelectedTransactions().forEach(t => {
+      if (!!t.reconciled !== reconciled) {
+        if (reconciled) t.reconciled = true;
+        else delete t.reconciled;
+        changed++;
+      }
+    });
+    if (changed > 0) saveTransactionsToStorage();
+    updateUI();
+    showToast(reconciled
+      ? `${changed} transaction(s) pointée(s)`
+      : `${changed} transaction(s) dépointée(s)`);
+  }
+
+  function toggleTxReconciled(id) {
+    const tx = state.transactions.find(t => t.id === id);
+    if (!tx) return;
+    if (tx.reconciled) delete tx.reconciled;
+    else tx.reconciled = true;
+    saveTransactionsToStorage();
+    updateUI();
+    // Conserve le focus clavier sur le bouton de la ligne
+    const btn = dom.transactionsTableBody && dom.transactionsTableBody.querySelector(`.reconcile-btn[data-id="${CSS.escape(id)}"]`);
+    if (btn) btn.focus();
+  }
+
+  /** Un changement de filtre repart de la page 1 et vide la sélection */
+  function onFiltersChanged() {
+    state.currentPage = 1;
+    clearSelection();
+    renderPeriodControls();
+    updateUI();
+  }
+
+  /** Affiche la navigation par mois ou les dates de la période personnalisée */
+  function renderPeriodControls() {
+    if (dom.filterPeriodSelect) dom.filterPeriodSelect.value = state.filterPeriod;
+    const isMonth = state.filterPeriod === 'month';
+    const isCustom = state.filterPeriod === 'custom';
+    if (dom.periodMonthBar) dom.periodMonthBar.classList.toggle('hidden', !isMonth);
+    if (dom.periodCustomBar) dom.periodCustomBar.classList.toggle('hidden', !isCustom);
+    if (isMonth && dom.periodMonthLabel) {
+      dom.periodMonthLabel.textContent = formatMonthLabel(state.filterMonth);
+      if (dom.currentMonthBtn) dom.currentMonthBtn.classList.toggle('hidden', state.filterMonth === getMonthKey());
+    }
+    if (isCustom) {
+      if (dom.filterFromInput && dom.filterFromInput.value !== state.filterFrom) dom.filterFromInput.value = state.filterFrom;
+      if (dom.filterToInput && dom.filterToInput.value !== state.filterTo) dom.filterToInput.value = state.filterTo;
+    }
+    if (dom.statsPeriodLabel) dom.statsPeriodLabel.textContent = getPeriodLabel();
+  }
+
+  function shiftFilterMonth(delta) {
+    state.filterMonth = shiftMonthKey(state.filterMonth || getMonthKey(), delta);
+    onFiltersChanged();
   }
 
   // ==========================================================================
@@ -3340,6 +4011,7 @@
     dom.editTxAmountInput.value = tx.amount;
     dom.editTxDateInput.value = tx.date;
     dom.editTxDescriptionInput.value = tx.description || '';
+    if (dom.editTxReconciled) dom.editTxReconciled.checked = !!tx.reconciled;
 
     populateAccountSelect(dom.editTxAccountSelect, tx.accountId || state.accounts[0]?.id || 'courant');
     const defaultTarget = tx.toAccountId || state.accounts.find(a => a.id !== tx.accountId)?.id || state.accounts[0]?.id || 'courant';
@@ -3369,6 +4041,12 @@
   }
 
   function closeAllModals() {
+    // Échap pendant l'assistant de bienvenue = « passer »
+    if (dom.onboardingModal && !dom.onboardingModal.classList.contains('hidden')) {
+      skipOnboarding();
+      return;
+    }
+    closeSettingsModal();
     closeAccountModal();
     closeGoalModal();
     closeGoalTransferModal();
@@ -3426,6 +4104,7 @@
   // ==========================================================================
 
   function updateUI() {
+    renderPeriodControls();
     renderAccounts();
     renderBalanceSection();
     renderForecast();
@@ -3451,6 +4130,11 @@
       goals: state.goals,
       recurring: state.recurring,
       categories: state.categories,
+      preferences: {
+        currency: state.settings.currency,
+        accent: state.settings.accent,
+        accentCustom: state.settings.accentCustom
+      },
       transactions: state.transactions
     };
 
@@ -3514,7 +4198,7 @@
       return;
     }
 
-    const headers = ['ID', 'Type', 'Montant', 'Compte', 'Compte_Destination', 'Categorie', 'Description', 'Date'];
+    const headers = ['ID', 'Type', 'Montant', 'Compte', 'Compte_Destination', 'Categorie', 'Description', 'Date', 'Pointee'];
     // Séparateur ";" + virgule décimale : ouverture directe dans Excel / LibreOffice en français
     const rows = state.transactions.map(tx => [
       csvCell(tx.id),
@@ -3524,7 +4208,8 @@
       csvCell(tx.type === 'transfer' && tx.toAccountId ? getAccountName(tx.toAccountId) : ''),
       csvCell(tx.category || ''),
       csvCell(tx.description || ''),
-      csvCell(tx.date)
+      csvCell(tx.date),
+      csvCell(tx.reconciled ? 'oui' : 'non')
     ]);
 
     const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
@@ -3582,23 +4267,44 @@
     saveCategoriesToStorage();
   }
 
-  function importJSONContent(jsonString) {
+  /**
+   * @param {string} jsonString
+   * @param {{skipConfirm?: boolean}} options skipConfirm : restauration depuis l'assistant de bienvenue (aucune donnée à perdre)
+   * @returns {boolean} true si les données ont été importées
+   */
+  function importJSONContent(jsonString, options = {}) {
     const parsed = JSON.parse(jsonString);
     const isArray = Array.isArray(parsed);
 
     if (!isArray && (!parsed || typeof parsed !== 'object')) {
       showToast('Fichier JSON non reconnu');
-      return;
+      return false;
     }
 
     const rawTransactions = isArray ? parsed : parsed.transactions;
     if (!Array.isArray(rawTransactions) && !Array.isArray(parsed.accounts)) {
       showToast('Aucune donnée Budget Manager trouvée dans ce fichier');
-      return;
+      return false;
     }
 
-    const confirmImport = window.confirm('L\'import JSON va remplacer vos données actuelles par celles du fichier. Pensez à exporter une sauvegarde avant. Continuer ?');
-    if (!confirmImport) return;
+    if (!options.skipConfirm) {
+      const confirmImport = window.confirm('L\'import JSON va remplacer vos données actuelles par celles du fichier. Pensez à exporter une sauvegarde avant. Continuer ?');
+      if (!confirmImport) return false;
+    }
+
+    // Préférences d'affichage enregistrées dans la sauvegarde (v5.1+)
+    if (!isArray && parsed.preferences && typeof parsed.preferences === 'object') {
+      const prefs = sanitizeSettings({ ...state.settings, ...parsed.preferences });
+      state.settings.accent = prefs.accent;
+      state.settings.accentCustom = prefs.accentCustom;
+      if (prefs.currency !== state.settings.currency) {
+        state.settings.currency = prefs.currency;
+        currencyFormatter = null;
+        updateCurrencyLabels();
+      }
+      saveSettingsToStorage();
+      applyAccent();
+    }
 
     if (!isArray) {
       const importedAccounts = sanitizeAccounts(parsed.accounts);
@@ -3636,9 +4342,11 @@
     ensureCategoriesFromData();
     saveAllToStorage();
     state.currentPage = 1;
+    clearSelection();
     refreshCategorySelects();
     updateUI();
     showToast(`Données importées avec succès (${state.transactions.length} transaction(s))`);
+    return true;
   }
 
   function importCSVContent(csvString) {
@@ -3695,6 +4403,10 @@
           if (type === 'transfer') {
             item.toAccountId = toAccountId;
           }
+          // Colonne « Pointee » (exports v5.1+)
+          if (parts.length >= 9 && /^(oui|yes|true|1|x)$/i.test((parts[8] || '').trim())) {
+            item.reconciled = true;
+          }
           newTransactions.push(item);
         }
       }
@@ -3732,11 +4444,17 @@
     state.filterAccount = 'all';
     state.filterType = 'all';
     state.filterPeriod = 'all';
+    state.filterMonth = getMonthKey();
+    state.filterFrom = '';
+    state.filterTo = '';
+    state.filterReconciled = 'all';
     state.searchQuery = '';
+    clearSelection();
 
     if (dom.filterAccountSelect) dom.filterAccountSelect.value = 'all';
     if (dom.filterTypeSelect) dom.filterTypeSelect.value = 'all';
     if (dom.filterPeriodSelect) dom.filterPeriodSelect.value = 'all';
+    if (dom.filterReconciledSelect) dom.filterReconciledSelect.value = 'all';
     if (dom.filterSearchInput) dom.filterSearchInput.value = '';
 
     saveAllToStorage();
@@ -3745,6 +4463,235 @@
     updateUI();
     renderBackupReminder();
     showToast('Toutes les données ont été réinitialisées');
+
+    // Propose de reconfigurer l'application comme lors d'une première visite
+    state.settings.onboardingPending = true;
+    saveSettingsToStorage();
+    openOnboarding();
+  }
+
+  // ==========================================================================
+  // 19 ter. Assistant de bienvenue (première visite)
+  // ==========================================================================
+
+  const ONBOARDING_STEPS = 3;
+
+  function openOnboarding() {
+    if (!dom.onboardingModal) return;
+    populateCurrencySelect(dom.onboardingCurrencySelect);
+    renderAccentSwatches(dom.onboardingAccentSwatches);
+    syncOnboardingThemeButtons();
+    const first = state.accounts[0];
+    if (dom.onboardingAccountName) dom.onboardingAccountName.value = first && state.accounts.length === 1 ? first.name : 'Compte Courant';
+    if (dom.onboardingAccountType) dom.onboardingAccountType.value = 'checking';
+    if (dom.onboardingAccountBalance) dom.onboardingAccountBalance.value = '';
+    goToOnboardingStep(1);
+    dom.onboardingModal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function goToOnboardingStep(step) {
+    state.onboardingStep = Math.min(ONBOARDING_STEPS, Math.max(1, step));
+    dom.onboardingSteps.forEach(el => {
+      el.classList.toggle('hidden', Number(el.getAttribute('data-step')) !== state.onboardingStep);
+    });
+    dom.onboardingDots.forEach(el => {
+      const n = Number(el.getAttribute('data-step'));
+      el.classList.toggle('active', n === state.onboardingStep);
+      el.classList.toggle('done', n < state.onboardingStep);
+    });
+    if (dom.onboardingStepLabel) dom.onboardingStepLabel.textContent = `Étape ${state.onboardingStep} sur ${ONBOARDING_STEPS}`;
+
+    // Focus sur le premier élément utile de l'étape
+    const focusTarget = state.onboardingStep === 1 ? dom.onboardingStartBtn
+      : state.onboardingStep === 2 ? dom.onboardingAccountName
+        : dom.onboardingFinishBtn;
+    if (focusTarget) setTimeout(() => focusTarget.focus(), 0);
+  }
+
+  function closeOnboarding() {
+    state.settings.onboardingPending = false;
+    saveSettingsToStorage();
+    if (dom.onboardingModal) dom.onboardingModal.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  /** « Passer » : on garde un compte courant vide, prêt à l'emploi */
+  function skipOnboarding() {
+    closeOnboarding();
+    showToast('Vous pourrez relancer l\'assistant depuis les Préférences (⚙)');
+  }
+
+  function syncOnboardingThemeButtons() {
+    const isDark = state.currentTheme === 'dark';
+    if (dom.onboardingThemeLight) {
+      dom.onboardingThemeLight.classList.toggle('active', !isDark);
+      dom.onboardingThemeLight.setAttribute('aria-checked', String(!isDark));
+    }
+    if (dom.onboardingThemeDark) {
+      dom.onboardingThemeDark.classList.toggle('active', isDark);
+      dom.onboardingThemeDark.setAttribute('aria-checked', String(isDark));
+    }
+  }
+
+  /** Étape 2 validée : remplace les comptes (vides) par le compte saisi */
+  function submitOnboardingAccount() {
+    const name = (dom.onboardingAccountName.value || '').trim().slice(0, 40);
+    if (!name) {
+      showToast('Donnez un nom à votre compte');
+      dom.onboardingAccountName.focus();
+      return;
+    }
+    const balance = toAmount(dom.onboardingAccountBalance.value || 0);
+    if (!Number.isFinite(balance)) {
+      showToast('Le solde saisi n\'est pas valide');
+      dom.onboardingAccountBalance.focus();
+      return;
+    }
+    const type = VALID_ACCOUNT_TYPES.includes(dom.onboardingAccountType.value) ? dom.onboardingAccountType.value : 'checking';
+
+    // Sans historique, le compte saisi remplace les comptes vides par défaut ;
+    // sinon (assistant relancé depuis les préférences) il s'ajoute aux comptes existants.
+    const newAccount = { id: 'acc-' + generateId(), name, type, initialBalance: balance };
+    if (state.transactions.length === 0) {
+      state.accounts = [newAccount];
+    } else {
+      state.accounts.push(newAccount);
+    }
+    state.filterAccount = 'all';
+    // Récurrences et objectifs éventuels sont rattachés / déliés proprement
+    repairAccountReferences();
+    saveAccountsToStorage();
+    saveGoalsToStorage();
+    saveRecurringToStorage();
+    updateUI();
+    goToOnboardingStep(3);
+  }
+
+  function finishOnboarding() {
+    closeOnboarding();
+    const accountName = state.accounts[0] ? state.accounts[0].name : 'Compte';
+    showToast(`C'est prêt ! Ajoutez votre première opération sur « ${accountName} »`);
+    const addSection = document.getElementById('ajouter');
+    if (addSection) addSection.scrollIntoView({ block: 'start' });
+    if (dom.txAmountInput) dom.txAmountInput.focus({ preventScroll: true });
+  }
+
+  /** Données de démonstration (comportement des versions précédentes à la première visite) */
+  function loadDemoData() {
+    if (state.transactions.length > 0 &&
+      !window.confirm('Les données de démonstration vont remplacer vos données actuelles. Continuer ?')) {
+      return;
+    }
+    state.accounts = deepClone(DEFAULT_ACCOUNTS);
+    state.transactions = sanitizeTransactions(deepClone(INITIAL_DEMO_DATA.transactions), DEFAULT_ACCOUNTS[0].id);
+    state.budgets = { ...INITIAL_DEMO_DATA.budgets };
+    state.goals = sanitizeGoals(deepClone(DEFAULT_GOALS));
+    state.recurring = sanitizeRecurring(deepClone(DEFAULT_RECURRING), DEFAULT_ACCOUNTS[0].id);
+    state.filterAccount = 'all';
+    clearSelection();
+    repairAccountReferences();
+    ensureCategoriesFromData();
+    if (state.settings.autoApplyRecurring) autoApplyRecurring();
+    saveAllToStorage();
+    refreshCategorySelects();
+    closeOnboarding();
+    updateUI();
+    showToast('Données de démonstration chargées — « Réinitialiser » (en bas de page) repart de zéro');
+  }
+
+  function handleOnboardingImport(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        if (importJSONContent(event.target.result, { skipConfirm: state.transactions.length === 0 })) {
+          closeOnboarding();
+          renderBackupReminder();
+        }
+      } catch (err) {
+        showToast('Ce fichier n\'est pas une sauvegarde Budget Manager valide (.json)');
+        console.error(err);
+      }
+      e.target.value = '';
+    };
+    reader.onerror = () => {
+      showToast('Impossible de lire le fichier sélectionné');
+      e.target.value = '';
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  // ==========================================================================
+  // 19 quater. Mise à jour de l'application (Service Worker)
+  // ==========================================================================
+
+  let waitingServiceWorker = null;
+  let updateRequested = false;
+
+  function showUpdateBanner(worker) {
+    waitingServiceWorker = worker;
+    if (dom.updateBanner) dom.updateBanner.classList.remove('hidden');
+  }
+
+  function applyPendingUpdate() {
+    if (!waitingServiceWorker) {
+      window.location.reload();
+      return;
+    }
+    updateRequested = true;
+    if (dom.updateNowBtn) {
+      dom.updateNowBtn.disabled = true;
+      dom.updateNowBtn.textContent = 'Mise à jour…';
+    }
+    waitingServiceWorker.postMessage({ type: 'SKIP_WAITING' });
+    // Filet de sécurité si l'événement « controllerchange » n'arrive pas
+    setTimeout(() => window.location.reload(), 3000);
+  }
+
+  function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+
+    // Recharge la page une fois la nouvelle version activée (uniquement à la demande de l'utilisateur :
+    // la toute première installation déclenche aussi cet événement)
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!updateRequested || reloading) return;
+      reloading = true;
+      window.location.reload();
+    });
+
+    const register = () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then((reg) => {
+          // Une version déjà téléchargée attend (onglet resté ouvert, « Plus tard »…)
+          if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner(reg.waiting);
+
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (!newWorker) return;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                showUpdateBanner(newWorker);
+              }
+            });
+          });
+
+          // Recherche de mise à jour au retour sur l'onglet et toutes les heures
+          const checkForUpdate = () => reg.update().catch(() => { /* hors-ligne : ignoré */ });
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') checkForUpdate();
+          });
+          setInterval(checkForUpdate, 60 * 60 * 1000);
+        })
+        .catch((err) => {
+          console.warn('Erreur Service Worker:', err);
+        });
+    };
+
+    if (document.readyState === 'complete') register();
+    else window.addEventListener('load', register);
   }
 
   // ==========================================================================
@@ -3825,8 +4772,7 @@
             state.filterAccount = accId;
           }
           if (dom.filterAccountSelect) dom.filterAccountSelect.value = state.filterAccount;
-          state.currentPage = 1;
-          updateUI();
+          onFiltersChanged();
         }
       });
 
@@ -3839,8 +4785,7 @@
         const accId = card.getAttribute('data-account-id');
         state.filterAccount = state.filterAccount === accId ? 'all' : accId;
         if (dom.filterAccountSelect) dom.filterAccountSelect.value = state.filterAccount;
-        state.currentPage = 1;
-        updateUI();
+        onFiltersChanged();
         const refocus = dom.accountsGrid.querySelector(`.account-card[data-account-id="${CSS.escape(accId)}"]`);
         if (refocus) refocus.focus();
       });
@@ -4137,7 +5082,7 @@
         const date = normalizeDateString(dom.txDateInput.value);
 
         if (isNaN(amount) || amount <= 0) {
-          showToast('Veuillez saisir un montant supérieur à 0 €');
+          showToast(`Veuillez saisir un montant supérieur à 0 ${getCurrencySymbol()}`);
           dom.txAmountInput.focus();
           return;
         }
@@ -4246,6 +5191,10 @@
         tx.category = category;
         tx.description = description ? description.trim() : '';
         tx.date = date;
+        if (dom.editTxReconciled) {
+          if (dom.editTxReconciled.checked) tx.reconciled = true;
+          else delete tx.reconciled;
+        }
 
         saveTransactionsToStorage();
         closeEditModal();
@@ -4256,7 +5205,21 @@
 
     // 10. Actions du tableau de transactions
     if (dom.transactionsTableBody) {
+      dom.transactionsTableBody.addEventListener('change', (e) => {
+        if (!e.target.classList.contains('tx-select-checkbox')) return;
+        const id = e.target.getAttribute('data-id');
+        toggleTxSelection(id, e.target.checked);
+        const box = dom.transactionsTableBody.querySelector(`.tx-select-checkbox[data-id="${CSS.escape(id)}"]`);
+        if (box) box.focus();
+      });
+
       dom.transactionsTableBody.addEventListener('click', (e) => {
+        const reconcileBtn = e.target.closest('.reconcile-btn');
+        if (reconcileBtn) {
+          toggleTxReconciled(reconcileBtn.getAttribute('data-id'));
+          return;
+        }
+
         const editBtn = e.target.closest('.edit-tx-btn');
         if (editBtn) {
           const id = editBtn.getAttribute('data-id');
@@ -4270,6 +5233,7 @@
           const index = state.transactions.findIndex(t => t.id === id);
           if (index !== -1) {
             const deleted = state.transactions.splice(index, 1)[0];
+            state.selectedTxIds.delete(id);
             saveTransactionsToStorage();
             updateUI();
 
@@ -4288,24 +5252,51 @@
     if (dom.filterAccountSelect) {
       dom.filterAccountSelect.addEventListener('change', (e) => {
         state.filterAccount = e.target.value;
-        state.currentPage = 1;
-        updateUI();
+        onFiltersChanged();
       });
     }
 
     if (dom.filterPeriodSelect) {
       dom.filterPeriodSelect.addEventListener('change', (e) => {
         state.filterPeriod = e.target.value;
-        state.currentPage = 1;
-        updateUI();
+        if (state.filterPeriod === 'month' && !state.filterMonth) state.filterMonth = getMonthKey();
+        if (state.filterPeriod === 'custom' && !state.filterFrom && !state.filterTo) {
+          // Proposition par défaut : du 1er du mois à aujourd'hui
+          state.filterFrom = getCurrentMonthBounds().start;
+          state.filterTo = getTodayDateString();
+        }
+        onFiltersChanged();
       });
     }
+
+    if (dom.prevMonthBtn) dom.prevMonthBtn.addEventListener('click', () => shiftFilterMonth(-1));
+    if (dom.nextMonthBtn) dom.nextMonthBtn.addEventListener('click', () => shiftFilterMonth(1));
+    if (dom.currentMonthBtn) {
+      dom.currentMonthBtn.addEventListener('click', () => {
+        state.filterMonth = getMonthKey();
+        onFiltersChanged();
+      });
+    }
+    [dom.filterFromInput, dom.filterToInput].forEach(input => {
+      if (!input) return;
+      input.addEventListener('change', () => {
+        state.filterFrom = normalizeDateString(dom.filterFromInput ? dom.filterFromInput.value : '');
+        state.filterTo = normalizeDateString(dom.filterToInput ? dom.filterToInput.value : '');
+        onFiltersChanged();
+      });
+    });
 
     if (dom.filterTypeSelect) {
       dom.filterTypeSelect.addEventListener('change', (e) => {
         state.filterType = e.target.value;
-        state.currentPage = 1;
-        updateUI();
+        onFiltersChanged();
+      });
+    }
+
+    if (dom.filterReconciledSelect) {
+      dom.filterReconciledSelect.addEventListener('change', (e) => {
+        state.filterReconciled = VALID_RECONCILED_FILTERS.includes(e.target.value) ? e.target.value : 'all';
+        onFiltersChanged();
       });
     }
 
@@ -4313,8 +5304,91 @@
       dom.filterSearchInput.addEventListener('input', (e) => {
         state.searchQuery = e.target.value;
         state.currentPage = 1;
+        clearSelection();
         renderTransactionsTable();
         renderStats();
+      });
+    }
+
+    // 11 bis. Sélection multiple & actions groupées
+    if (dom.selectAllTxCheckbox) {
+      dom.selectAllTxCheckbox.addEventListener('change', (e) => setPageSelection(e.target.checked));
+    }
+    if (dom.bulkSelectAllFilteredBtn) dom.bulkSelectAllFilteredBtn.addEventListener('click', selectAllFiltered);
+    if (dom.bulkClearBtn) {
+      dom.bulkClearBtn.addEventListener('click', () => {
+        clearSelection();
+        renderTransactionsTable();
+      });
+    }
+    if (dom.bulkDeleteBtn) dom.bulkDeleteBtn.addEventListener('click', bulkDeleteSelected);
+    if (dom.bulkReconcileBtn) dom.bulkReconcileBtn.addEventListener('click', () => bulkSetReconciled(true));
+    if (dom.bulkUnreconcileBtn) dom.bulkUnreconcileBtn.addEventListener('click', () => bulkSetReconciled(false));
+    if (dom.bulkCategorySelect) {
+      dom.bulkCategorySelect.addEventListener('change', (e) => {
+        if (e.target.value) bulkChangeCategory(e.target.value);
+      });
+    }
+
+    // 11 ter. Confidentialité, préférences & assistant de bienvenue
+    if (dom.privacyToggleBtn) {
+      dom.privacyToggleBtn.addEventListener('click', () => setPrivacyMode(!state.settings.privacyMode));
+    }
+    if (dom.settingsBtn) dom.settingsBtn.addEventListener('click', openSettingsModal);
+    if (dom.closeSettingsModalBtn) dom.closeSettingsModalBtn.addEventListener('click', closeSettingsModal);
+    if (dom.closeSettingsFooterBtn) dom.closeSettingsFooterBtn.addEventListener('click', closeSettingsModal);
+    if (dom.settingsModal) {
+      dom.settingsModal.addEventListener('click', (e) => {
+        if (e.target === dom.settingsModal) closeSettingsModal();
+      });
+    }
+    if (dom.settingsCurrencySelect) {
+      dom.settingsCurrencySelect.addEventListener('change', (e) => {
+        setCurrency(e.target.value);
+        showToast('Devise d\'affichage mise à jour (aucun montant n\'a été converti)');
+      });
+    }
+    if (dom.settingsPrivacyToggle) {
+      dom.settingsPrivacyToggle.addEventListener('change', (e) => setPrivacyMode(e.target.checked));
+    }
+    if (dom.settingsOnboardingBtn) {
+      dom.settingsOnboardingBtn.addEventListener('click', () => {
+        closeSettingsModal();
+        openOnboarding();
+      });
+    }
+    bindAccentSwatches(dom.settingsAccentSwatches);
+    bindAccentSwatches(dom.onboardingAccentSwatches);
+
+    if (dom.onboardingSkipBtn) dom.onboardingSkipBtn.addEventListener('click', skipOnboarding);
+    if (dom.onboardingStartBtn) dom.onboardingStartBtn.addEventListener('click', () => goToOnboardingStep(2));
+    if (dom.onboardingDemoBtn) dom.onboardingDemoBtn.addEventListener('click', loadDemoData);
+    if (dom.onboardingImportInput) dom.onboardingImportInput.addEventListener('change', handleOnboardingImport);
+    if (dom.onboardingAccountForm) {
+      dom.onboardingAccountForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        submitOnboardingAccount();
+      });
+    }
+    if (dom.onboardingCurrencySelect) {
+      dom.onboardingCurrencySelect.addEventListener('change', (e) => setCurrency(e.target.value));
+    }
+    if (dom.onboardingModal) {
+      dom.onboardingModal.addEventListener('click', (e) => {
+        const back = e.target.closest('[data-onboarding-back]');
+        if (back) goToOnboardingStep(state.onboardingStep - 1);
+      });
+    }
+    if (dom.onboardingThemeLight) dom.onboardingThemeLight.addEventListener('click', () => applyTheme('light'));
+    if (dom.onboardingThemeDark) dom.onboardingThemeDark.addEventListener('click', () => applyTheme('dark'));
+    if (dom.onboardingFinishBtn) dom.onboardingFinishBtn.addEventListener('click', finishOnboarding);
+
+    // 11 quater. Bandeau de mise à jour
+    if (dom.updateNowBtn) dom.updateNowBtn.addEventListener('click', applyPendingUpdate);
+    if (dom.updateLaterBtn) {
+      dom.updateLaterBtn.addEventListener('click', () => {
+        if (dom.updateBanner) dom.updateBanner.classList.add('hidden');
+        showToast('La mise à jour sera installée à la prochaine ouverture de l\'application');
       });
     }
 
@@ -4370,6 +5444,9 @@
   // ==========================================================================
 
   function init() {
+    // 0. Réglages (devise, couleur d'accent, confidentialité, pagination…) avant tout affichage
+    state.settings = sanitizeSettings(loadJsonFromStorage(STORAGE_KEY_SETTINGS));
+
     // 1. Initialiser le thème (préférence enregistrée, sinon thème du système)
     const savedTheme = loadThemeFromStorage();
     applyTheme(savedTheme || getSystemTheme(), false);
@@ -4386,55 +5463,45 @@
     const storedTxs = loadTransactionsFromStorage();
     const isFirstVisit = storedAccounts === null && storedBalance === null && storedTxs === null;
 
-    // 1 bis. Réglages (pagination, récurrences automatiques, sauvegardes) et catégories
-    state.settings = sanitizeSettings(loadJsonFromStorage(STORAGE_KEY_SETTINGS));
+    // 1 bis. Réglages de première utilisation et catégories
     if (!state.settings.firstUseAt) state.settings.firstUseAt = Date.now();
+    // Première visite : un compte vide et l'assistant de bienvenue (plus de données de démo imposées)
+    if (isFirstVisit) state.settings.onboardingPending = true;
     state.categories = sanitizeCategories(loadJsonFromStorage(STORAGE_KEY_CATEGORIES));
 
     // 2. Charger les comptes
     if (storedAccounts && storedAccounts.length > 0) {
       state.accounts = sanitizeAccounts(storedAccounts);
-    } else if (!isFirstVisit) {
-      // Migration v1/v2 : un seul solde initial, pas de comptes.
-      // On conserve ce solde sur un compte unique au lieu d'ajouter des comptes de démonstration.
+    } else {
+      // Première visite, ou migration v1/v2 (un seul solde initial, pas de comptes) :
+      // un compte unique, qui conserve l'éventuel ancien solde.
       state.accounts = [{
         id: 'courant',
         name: 'Compte Courant',
         type: 'checking',
         initialBalance: storedBalance !== null ? storedBalance : 0
       }];
-    } else {
-      state.accounts = deepClone(DEFAULT_ACCOUNTS);
     }
 
     // 3. Charger le solde initial (conservé pour compatibilité des exports)
-    state.initialBalance = storedBalance !== null ? storedBalance : INITIAL_DEMO_DATA.initialBalance;
+    state.initialBalance = storedBalance !== null ? storedBalance : 0;
 
     const fallbackAccountId = state.accounts[0]?.id || 'courant';
 
     // 4. Charger les transactions
-    // Les données de démonstration ne sont injectées qu'à la toute première visite
-    state.transactions = storedTxs !== null
-      ? sanitizeTransactions(storedTxs, fallbackAccountId)
-      : (isFirstVisit ? deepClone(INITIAL_DEMO_DATA.transactions) : []);
+    state.transactions = storedTxs !== null ? sanitizeTransactions(storedTxs, fallbackAccountId) : [];
 
     // 5. Charger les budgets
     const storedBudgets = loadBudgetsFromStorage();
-    state.budgets = storedBudgets !== null
-      ? sanitizeBudgets(storedBudgets)
-      : (isFirstVisit ? { ...INITIAL_DEMO_DATA.budgets } : {});
+    state.budgets = storedBudgets !== null ? sanitizeBudgets(storedBudgets) : {};
 
     // 6. Charger les objectifs d'épargne
     const storedGoals = loadGoalsFromStorage();
-    state.goals = storedGoals !== null
-      ? sanitizeGoals(storedGoals)
-      : (isFirstVisit ? deepClone(DEFAULT_GOALS) : []);
+    state.goals = storedGoals !== null ? sanitizeGoals(storedGoals) : [];
 
     // 7. Charger les récurrences
     const storedRecurring = loadRecurringFromStorage();
-    state.recurring = storedRecurring !== null
-      ? sanitizeRecurring(storedRecurring, fallbackAccountId)
-      : (isFirstVisit ? sanitizeRecurring(DEFAULT_RECURRING, fallbackAccountId) : []);
+    state.recurring = storedRecurring !== null ? sanitizeRecurring(storedRecurring, fallbackAccountId) : [];
 
     repairAccountReferences();
     ensureCategoriesFromData();
@@ -4442,8 +5509,20 @@
     // 7 bis. Application automatique des échéances récurrentes passées
     const autoApplied = state.settings.autoApplyRecurring ? autoApplyRecurring() : 0;
 
+    // 7 ter. Mise à jour de l'application depuis la dernière visite ?
+    const previousVersion = state.settings.lastSeenVersion;
+    const justUpdated = !isFirstVisit && previousVersion !== APP_VERSION;
+    state.settings.lastSeenVersion = APP_VERSION;
+
     saveAllToStorage();
     saveSettingsToStorage();
+
+    // 7 quater. Préférences d'affichage
+    applyAccent();
+    applyPrivacyUi();
+    updateCurrencyLabels();
+    populateCurrencySelect(dom.settingsCurrencySelect);
+    renderAllAccentSwatches();
 
     // 8. Initialiser les sélecteurs et la date du jour
     // (synchronise l'interface avec le type éventuellement restauré par le navigateur)
@@ -4460,22 +5539,19 @@
     // 10. Premier rendu de l'interface
     updateUI();
     renderBackupReminder();
+    const showUpdatedToast = () => showToast(`Budget Manager a été mis à jour en v${APP_VERSION}`, 'Nouveautés', openChangelogModal);
     if (autoApplied > 0) {
       showToast(`⚡ ${autoApplied} opération(s) récurrente(s) échue(s) ajoutée(s) automatiquement`);
+      if (justUpdated) setTimeout(showUpdatedToast, 4800);
+    } else if (justUpdated) {
+      showUpdatedToast();
     }
 
-    // 11. Enregistrement PWA (Service Worker pour fonctionnement hors-ligne)
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then((reg) => {
-            console.log('Service Worker enregistré:', reg.scope);
-          })
-          .catch((err) => {
-            console.warn('Erreur Service Worker:', err);
-          });
-      });
-    }
+    // 10 bis. Assistant de bienvenue (première visite ou après réinitialisation)
+    if (state.settings.onboardingPending) openOnboarding();
+
+    // 11. Enregistrement PWA (Service Worker hors-ligne + notification de nouvelle version)
+    registerServiceWorker();
   }
 
   // Lancement dès que le DOM est prêt

@@ -55,7 +55,25 @@
         </nav>
         <button type="button" id="versionBadgeBtn" class="version-badge" title="Afficher le journal des versions (Changelog)">
           <span class="version-dot"></span>
-          <span>v5.0.1</span>
+          <span>v5.1.0</span>
+        </button>
+        <button type="button" id="privacyToggleBtn" class="theme-toggle-btn" aria-pressed="false" title="Masquer les montants (mode confidentialité)" aria-label="Masquer les montants (mode confidentialité)">
+          <svg class="icon-theme icon-eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          <svg class="icon-theme icon-eye-closed hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-6.5 0-10-7-10-7a18.45 18.45 0 0 1 5.06-5.94"></path>
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19"></path>
+            <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"></path>
+            <line x1="2" y1="2" x2="22" y2="22"></line>
+          </svg>
+        </button>
+        <button type="button" id="settingsBtn" class="theme-toggle-btn" title="Préférences (devise, couleur, confidentialité)" aria-label="Préférences">
+          <svg class="icon-theme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
         </button>
         <button type="button" id="themeToggleBtn" class="theme-toggle-btn" title="Changer de thème (Clair / Sombre)" aria-label="Changer de thème">
           <svg class="icon-theme icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -86,6 +104,22 @@
   <!-- Contenu principal -->
   <main class="container main-content">
 
+    <!-- Nouvelle version disponible (Service Worker en attente) -->
+    <div id="updateBanner" class="backup-banner update-banner hidden" role="status">
+      <svg class="backup-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+      </svg>
+      <div class="backup-banner-text">
+        <strong>Une nouvelle version de Budget Manager est disponible</strong>
+        <span>Mettez à jour pour profiter des dernières nouveautés. Vos données sont conservées.</span>
+      </div>
+      <div class="backup-banner-actions">
+        <button type="button" id="updateNowBtn" class="btn btn-primary btn-sm">Mettre à jour</button>
+        <button type="button" id="updateLaterBtn" class="btn btn-subtle btn-sm">Plus tard</button>
+      </div>
+    </div>
+
     <!-- Rappel de sauvegarde (affiché si aucun export JSON depuis 30 jours) -->
     <div id="backupReminder" class="backup-banner hidden" role="status">
       <svg class="backup-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -115,6 +149,7 @@
           <div class="card-caption">Solde total disponible</div>
           <div id="currentBalanceDisplay" class="balance-amount neutral">0,00 €</div>
           <div class="balance-subtext" id="balanceSubtext">Solde initial : 0,00 €</div>
+          <div class="balance-reconciled hidden" id="reconciledBalanceInfo" title="Solde en ne comptant que les opérations pointées (vérifiées sur votre relevé bancaire)"></div>
         </div>
 
         <div class="balance-card income-summary-card">
@@ -195,7 +230,7 @@
 
             <!-- Montant -->
             <div class="form-group">
-              <label for="txAmount" class="form-label">Montant (€) <span class="required">*</span></label>
+              <label for="txAmount" class="form-label">Montant (<span class="cur-sym">€</span>) <span class="required">*</span></label>
               <div class="input-with-symbol">
                 <input type="number" id="txAmount" name="txAmount" step="0.01" min="0.01" placeholder="0.00" required>
                 <span class="currency-symbol">€</span>
@@ -278,6 +313,8 @@
                 <option value="this-month">Ce mois-ci</option>
                 <option value="last-month">Mois dernier</option>
                 <option value="this-year">Cette année</option>
+                <option value="month">Choisir un mois…</option>
+                <option value="custom">Période personnalisée…</option>
               </select>
             </div>
             <div class="filter-group">
@@ -290,9 +327,53 @@
               </select>
             </div>
             <div class="filter-group">
+              <label for="filterReconciled" class="visually-hidden">Filtrer par pointage</label>
+              <select id="filterReconciled" class="select-sm">
+                <option value="all">Pointées et non pointées</option>
+                <option value="unreconciled">Non pointées</option>
+                <option value="reconciled">Pointées</option>
+              </select>
+            </div>
+            <div class="filter-group">
               <label for="filterSearch" class="visually-hidden">Rechercher</label>
               <input type="search" id="filterSearch" class="input-sm" placeholder="Rechercher...">
             </div>
+          </div>
+        </div>
+
+        <!-- Navigation par mois (filtre « Choisir un mois ») -->
+        <div id="periodMonthBar" class="period-bar hidden">
+          <button type="button" id="prevMonthBtn" class="pagination-btn" aria-label="Mois précédent">‹</button>
+          <span id="periodMonthLabel" class="period-month-label" aria-live="polite">Novembre 2026</span>
+          <button type="button" id="nextMonthBtn" class="pagination-btn" aria-label="Mois suivant">›</button>
+          <button type="button" id="currentMonthBtn" class="btn btn-subtle btn-sm hidden">Revenir au mois en cours</button>
+        </div>
+
+        <!-- Période personnalisée -->
+        <div id="periodCustomBar" class="period-bar hidden">
+          <label class="period-date-field">
+            <span>Du</span>
+            <input type="date" id="filterFrom" class="input-sm">
+          </label>
+          <label class="period-date-field">
+            <span>au</span>
+            <input type="date" id="filterTo" class="input-sm">
+          </label>
+        </div>
+
+        <!-- Actions groupées (affichées dès qu'une transaction est sélectionnée) -->
+        <div id="bulkActionsBar" class="bulk-bar hidden" role="region" aria-label="Actions sur la sélection">
+          <div class="bulk-info">
+            <strong id="bulkCount" aria-live="polite">0 transaction sélectionnée</strong>
+            <button type="button" id="bulkSelectAllFilteredBtn" class="btn-link hidden">Sélectionner toutes les transactions filtrées</button>
+          </div>
+          <div class="bulk-actions">
+            <label for="bulkCategorySelect" class="visually-hidden">Changer la catégorie des transactions sélectionnées</label>
+            <select id="bulkCategorySelect" class="select-sm"></select>
+            <button type="button" id="bulkReconcileBtn" class="btn btn-subtle btn-sm">✓ Pointer</button>
+            <button type="button" id="bulkUnreconcileBtn" class="btn btn-subtle btn-sm">Dépointer</button>
+            <button type="button" id="bulkDeleteBtn" class="btn btn-subtle-danger btn-sm">Supprimer</button>
+            <button type="button" id="bulkClearBtn" class="btn btn-subtle btn-sm">Tout désélectionner</button>
           </div>
         </div>
 
@@ -301,12 +382,16 @@
           <table class="transactions-table" id="transactionsTable">
             <thead>
               <tr>
+                <th scope="col" class="cell-select">
+                  <input type="checkbox" id="selectAllTx" aria-label="Sélectionner toutes les transactions de la page">
+                </th>
                 <th scope="col">Type</th>
                 <th scope="col">Montant</th>
                 <th scope="col">Compte</th>
                 <th scope="col">Catégorie</th>
                 <th scope="col">Description</th>
                 <th scope="col">Date</th>
+                <th scope="col" class="cell-reconcile" title="Opération pointée : vérifiée sur votre relevé bancaire">Pointé</th>
                 <th scope="col" class="text-right">Actions</th>
               </tr>
             </thead>
@@ -354,7 +439,7 @@
         <!-- Synthèse globale des budgets du mois -->
         <div id="budgetsGlobalSummary" class="budgets-summary-box">
           <div class="budget-summary-item">
-            <span class="summary-label">Budget alloué (ce mois)</span>
+            <span class="summary-label" id="budgetAllocatedLabel">Budget alloué (ce mois)</span>
             <span id="budgetTotalAllocated" class="summary-val">0,00 €</span>
           </div>
           <div class="budget-summary-item">
@@ -498,7 +583,7 @@
     <section id="statistiques" class="section stats-section" aria-labelledby="stats-title">
       <div class="section-card">
         <h2 id="stats-title" class="section-title">Statistiques & Analyse</h2>
-        <p class="section-subtitle">Vue d'ensemble synthétique de vos flux financiers selon la période sélectionnée</p>
+        <p class="section-subtitle">Vue d'ensemble synthétique de vos flux financiers selon la période sélectionnée : <strong id="statsPeriodLabel">Toutes les périodes</strong></p>
 
         <!-- Cartes statistiques -->
         <div class="stats-grid">
@@ -592,7 +677,7 @@
         </div>
 
         <div class="form-group">
-          <label for="editTxAmount" class="form-label">Montant (€) <span class="required">*</span></label>
+          <label for="editTxAmount" class="form-label">Montant (<span class="cur-sym">€</span>) <span class="required">*</span></label>
           <div class="input-with-symbol">
             <input type="number" id="editTxAmount" name="editTxAmount" step="0.01" min="0.01" required>
             <span class="currency-symbol">€</span>
@@ -624,6 +709,13 @@
           <input type="text" id="editTxDescription" name="editTxDescription" maxlength="120" placeholder="Ex: Courses, Facture...">
         </div>
 
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="editTxReconciled">
+            <span>Opération pointée <span class="optional">(vérifiée sur le relevé bancaire)</span></span>
+          </label>
+        </div>
+
         <div class="modal-actions">
           <button type="button" id="cancelEditModalBtn" class="btn btn-secondary">Annuler</button>
           <button type="submit" class="btn btn-primary">Enregistrer</button>
@@ -648,7 +740,7 @@
           </select>
         </div>
         <div class="form-group">
-          <label for="budgetLimitInput" class="form-label">Plafond mensuel max (€) <span class="required">*</span></label>
+          <label for="budgetLimitInput" class="form-label">Plafond mensuel max (<span class="cur-sym">€</span>) <span class="required">*</span></label>
           <div class="input-with-symbol">
             <input type="number" id="budgetLimitInput" step="0.01" min="1" placeholder="Ex: 350.00" required>
             <span class="currency-symbol">€</span>
@@ -685,7 +777,7 @@
           </select>
         </div>
         <div class="form-group">
-          <label for="accountInitialBalanceInput" class="form-label">Solde initial (€) <span class="required">*</span></label>
+          <label for="accountInitialBalanceInput" class="form-label">Solde initial (<span class="cur-sym">€</span>) <span class="required">*</span></label>
           <div class="input-with-symbol">
             <input type="number" id="accountInitialBalanceInput" step="0.01" placeholder="0.00" required>
             <span class="currency-symbol">€</span>
@@ -713,14 +805,14 @@
           <input type="text" id="goalNameInput" placeholder="Ex: Vacances d'été, Fonds d'urgence, Permis..." required maxlength="50">
         </div>
         <div class="form-group">
-          <label for="goalTargetInput" class="form-label">Montant cible visé (€) <span class="required">*</span></label>
+          <label for="goalTargetInput" class="form-label">Montant cible visé (<span class="cur-sym">€</span>) <span class="required">*</span></label>
           <div class="input-with-symbol">
             <input type="number" id="goalTargetInput" step="0.01" min="1" placeholder="Ex: 1500.00" required>
             <span class="currency-symbol">€</span>
           </div>
         </div>
         <div class="form-group">
-          <label for="goalCurrentInput" class="form-label">Montant déjà épargné (€)</label>
+          <label for="goalCurrentInput" class="form-label">Montant déjà épargné (<span class="cur-sym">€</span>)</label>
           <div class="input-with-symbol">
             <input type="number" id="goalCurrentInput" step="0.01" min="0" placeholder="0.00">
             <span class="currency-symbol">€</span>
@@ -757,7 +849,7 @@
         <p id="goalTransferDesc" class="form-help" style="margin-bottom: 1rem; font-size: 0.95rem; font-weight: 500;">Projet : <strong>Voyage</strong></p>
 
         <div class="form-group">
-          <label for="goalTransferAmountInput" class="form-label">Montant (€) <span class="required">*</span></label>
+          <label for="goalTransferAmountInput" class="form-label">Montant (<span class="cur-sym">€</span>) <span class="required">*</span></label>
           <div class="input-with-symbol">
             <input type="number" id="goalTransferAmountInput" step="0.01" min="0.01" placeholder="Ex: 50.00" required>
             <span class="currency-symbol">€</span>
@@ -805,7 +897,7 @@
         </div>
 
         <div class="form-group">
-          <label for="recAmountInput" class="form-label">Montant (€) <span class="required">*</span></label>
+          <label for="recAmountInput" class="form-label">Montant (<span class="cur-sym">€</span>) <span class="required">*</span></label>
           <div class="input-with-symbol">
             <input type="number" id="recAmountInput" step="0.01" min="0.01" placeholder="Ex: 12.99" required>
             <span class="currency-symbol">€</span>
@@ -877,13 +969,148 @@
     </div>
   </div>
 
+  <!-- Modale Préférences -->
+  <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-labelledby="settingsModalTitle" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="settingsModalTitle" class="modal-title">Préférences</h3>
+        <button type="button" id="closeSettingsModalBtn" class="btn-close-modal" aria-label="Fermer les préférences">&times;</button>
+      </div>
+
+      <div class="form-group">
+        <label for="settingsCurrencySelect" class="form-label">Devise d'affichage</label>
+        <select id="settingsCurrencySelect"></select>
+        <p class="form-help">Change uniquement l'affichage : les montants enregistrés ne sont pas convertis.</p>
+      </div>
+
+      <div class="form-group">
+        <span class="form-label" id="settingsAccentLabel">Couleur d'accent</span>
+        <div id="settingsAccentSwatches" class="accent-swatches" role="radiogroup" aria-labelledby="settingsAccentLabel"></div>
+      </div>
+
+      <div class="form-group">
+        <span class="form-label">Confidentialité</span>
+        <label class="switch-label">
+          <input type="checkbox" id="settingsPrivacyToggle" class="switch-input">
+          <span class="switch-track" aria-hidden="true"></span>
+          <span>Masquer les montants à l'écran</span>
+        </label>
+        <p class="form-help">Pratique en public : le bouton 👁 de l'en-tête active ou désactive ce mode en un clic.</p>
+      </div>
+
+      <div class="modal-actions modal-actions-split">
+        <button type="button" id="settingsOnboardingBtn" class="btn btn-subtle btn-sm">Relancer l'assistant de bienvenue</button>
+        <button type="button" id="closeSettingsFooterBtn" class="btn btn-secondary">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assistant de bienvenue (première visite) -->
+  <div id="onboardingModal" class="modal-overlay hidden" role="dialog" aria-labelledby="onboardingTitle" aria-modal="true">
+    <div class="modal-card onboarding-card">
+      <div class="onboarding-top">
+        <div class="onboarding-progress" aria-hidden="true">
+          <span class="onboarding-dot active" data-step="1"></span>
+          <span class="onboarding-dot" data-step="2"></span>
+          <span class="onboarding-dot" data-step="3"></span>
+        </div>
+        <span id="onboardingStepLabel" class="onboarding-step-label">Étape 1 sur 3</span>
+        <button type="button" id="onboardingSkipBtn" class="btn-link">Passer</button>
+      </div>
+
+      <!-- Étape 1 : Bienvenue -->
+      <div class="onboarding-step" data-step="1">
+        <svg class="onboarding-hero-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect width="20" height="14" x="2" y="5" rx="2"></rect>
+          <line x1="2" x2="22" y1="10" y2="10"></line>
+        </svg>
+        <h3 id="onboardingTitle" class="modal-title onboarding-title">Bienvenue sur Budget Manager</h3>
+        <p class="onboarding-text">Suivez vos revenus, vos dépenses, vos budgets et votre épargne. Tout reste <strong>dans ce navigateur</strong> : aucun compte à créer, aucune donnée envoyée.</p>
+        <div class="onboarding-choices">
+          <button type="button" id="onboardingStartBtn" class="btn btn-primary onboarding-choice">
+            <span class="onboarding-choice-title">Commencer avec mes données</span>
+            <span class="onboarding-choice-desc">Créez votre premier compte en 2 minutes</span>
+          </button>
+          <button type="button" id="onboardingDemoBtn" class="btn btn-secondary onboarding-choice">
+            <span class="onboarding-choice-title">Explorer avec des données de démonstration</span>
+            <span class="onboarding-choice-desc">Comptes, budgets et objectifs fictifs pour découvrir l'application</span>
+          </button>
+          <label class="btn btn-secondary onboarding-choice btn-file-label">
+            <span class="onboarding-choice-title">Restaurer une sauvegarde</span>
+            <span class="onboarding-choice-desc">Fichier .json exporté depuis Budget Manager</span>
+            <input type="file" id="onboardingImportInput" accept=".json" class="visually-hidden">
+          </label>
+        </div>
+      </div>
+
+      <!-- Étape 2 : Premier compte -->
+      <form id="onboardingAccountForm" class="onboarding-step hidden" data-step="2" novalidate>
+        <h3 class="modal-title onboarding-title">Votre premier compte</h3>
+        <p class="onboarding-text">Indiquez le compte que vous utilisez le plus. Vous pourrez en ajouter d'autres (livret, espèces…) à tout moment.</p>
+        <div class="form-group">
+          <label for="onboardingAccountName" class="form-label">Nom du compte <span class="required">*</span></label>
+          <input type="text" id="onboardingAccountName" maxlength="40" placeholder="Ex : Compte Courant, Compte joint…" required>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="onboardingAccountType" class="form-label">Type de compte</label>
+            <select id="onboardingAccountType">
+              <option value="checking">Compte Courant</option>
+              <option value="savings">Livret / Épargne</option>
+              <option value="cash">Espèces / Portefeuille physique</option>
+              <option value="other">Autre compte</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="onboardingCurrencySelect" class="form-label">Devise</label>
+            <select id="onboardingCurrencySelect"></select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="onboardingAccountBalance" class="form-label">Solde actuel (<span class="cur-sym">€</span>)</label>
+          <div class="input-with-symbol">
+            <input type="number" id="onboardingAccountBalance" step="0.01" placeholder="0.00" inputmode="decimal">
+            <span class="currency-symbol">€</span>
+          </div>
+          <p class="form-help">Le montant affiché aujourd'hui par votre banque. Il peut être négatif.</p>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" data-onboarding-back>Retour</button>
+          <button type="submit" class="btn btn-primary">Suivant</button>
+        </div>
+      </form>
+
+      <!-- Étape 3 : Personnalisation -->
+      <div class="onboarding-step hidden" data-step="3">
+        <h3 class="modal-title onboarding-title">À votre goût</h3>
+        <p class="onboarding-text">Choisissez l'apparence de l'application. Ces réglages restent modifiables dans les Préférences (⚙).</p>
+        <div class="form-group">
+          <span class="form-label" id="onboardingThemeLabel">Thème</span>
+          <div class="type-toggle" role="radiogroup" aria-labelledby="onboardingThemeLabel">
+            <button type="button" id="onboardingThemeLight" class="toggle-option" role="radio" aria-checked="true">☀ Clair</button>
+            <button type="button" id="onboardingThemeDark" class="toggle-option" role="radio" aria-checked="false">☾ Sombre</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <span class="form-label" id="onboardingAccentLabel">Couleur d'accent</span>
+          <div id="onboardingAccentSwatches" class="accent-swatches" role="radiogroup" aria-labelledby="onboardingAccentLabel"></div>
+        </div>
+        <p class="onboarding-tip">💡 Astuce : le bouton 👁 en haut de l'écran masque vos montants quand quelqu'un regarde par-dessus votre épaule.</p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" data-onboarding-back>Retour</button>
+          <button type="button" id="onboardingFinishBtn" class="btn btn-primary">C'est parti !</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modale Journal des versions (Changelog) -->
   <div id="changelogModal" class="modal-overlay hidden" role="dialog" aria-labelledby="changelogModalTitle" aria-modal="true">
     <div class="modal-card modal-large">
       <div class="modal-header">
         <div class="modal-title-with-badge">
           <h3 id="changelogModalTitle" class="modal-title">Journal des versions</h3>
-          <span class="version-tag">Actuelle : v5.0.1</span>
+          <span class="version-tag">Actuelle : v5.1.0</span>
         </div>
         <button type="button" id="closeChangelogModalBtn" class="btn-close-modal" aria-label="Fermer le journal des versions">&times;</button>
       </div>
@@ -941,7 +1168,7 @@
       </div>
 
       <div class="footer-credits">
-        <p><strong>Budget Manager</strong> <button type="button" id="footerVersionBtn" class="footer-version-btn" title="Voir les notes de version">v5.0.1</button> — Outil de gestion financière personnelle, simple, sécurisé et 100% local.</p>
+        <p><strong>Budget Manager</strong> <button type="button" id="footerVersionBtn" class="footer-version-btn" title="Voir les notes de version">v5.1.0</button> — Outil de gestion financière personnelle, simple, sécurisé et 100% local.</p>
         <p class="legal-note">Toutes les données sont stockées exclusivement dans la mémoire locale de votre navigateur (localStorage). Aucun compte, aucun serveur, aucune collecte.</p>
         <p class="legal-note" id="lastBackupInfo"></p>
       </div>

@@ -27,6 +27,8 @@
   --primary-color: #2563eb;
   --primary-hover: #1d4ed8;
   --primary-light: #eff6ff;
+  --primary-rgb: 37, 99, 235;
+  --on-primary: #ffffff;
 
   --income-color: #16a34a;
   --income-bg: #f0fdf4;
@@ -71,6 +73,8 @@
   --primary-color: #3b82f6;
   --primary-hover: #60a5fa;
   --primary-light: #172554;
+  --primary-rgb: 59, 130, 246;
+  --on-primary: #ffffff;
 
   --income-color: #22c55e;
   --income-bg: #052e16;
@@ -369,7 +373,7 @@ a {
 
 .btn-primary {
   background-color: var(--primary-color);
-  color: #ffffff;
+  color: var(--on-primary);
   border-color: var(--primary-color);
   box-shadow: var(--shadow-xs);
 }
@@ -798,7 +802,7 @@ select {
 input:focus,
 select:focus {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.15);
 }
 
 .input-with-symbol {
@@ -909,7 +913,7 @@ select:focus {
 .badge-transfer {
   background-color: var(--primary-light);
   color: var(--primary-color);
-  border: 1px solid rgba(37, 99, 235, 0.25);
+  border: 1px solid rgba(var(--primary-rgb), 0.25);
 }
 
 .account-pill {
@@ -1854,7 +1858,7 @@ select:focus {
 
 .btn-toast-action {
   background: var(--primary-color);
-  color: #ffffff;
+  color: var(--on-primary);
   border: none;
   border-radius: var(--radius-sm);
   padding: 0.25rem 0.65rem;
@@ -2032,7 +2036,7 @@ select:focus {
 .pagination-btn.active {
   background-color: var(--primary-color);
   border-color: var(--primary-color);
-  color: #ffffff;
+  color: var(--on-primary);
   font-weight: 600;
   cursor: default;
 }
@@ -2408,5 +2412,441 @@ select:focus {
     bottom: 1rem;
     text-align: center;
     justify-content: center;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   14. v5.1 — Période, sélection multiple, pointage, préférences & accueil
+   -------------------------------------------------------------------------- */
+
+/* Lien-bouton discret */
+.btn-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary-color);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.btn-link:hover {
+  color: var(--primary-hover);
+}
+
+.btn-link:focus-visible,
+.reconcile-btn:focus-visible,
+.accent-swatch:focus-visible,
+.accent-swatch-custom:focus-within,
+.onboarding-choice:focus-visible,
+.type-toggle .toggle-option:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* Navigation par mois & période personnalisée */
+.period-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.85rem;
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+}
+
+.period-month-label {
+  min-width: 9.5rem;
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.period-date-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.period-date-field input {
+  width: auto;
+}
+
+/* Barre d'actions groupées */
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--primary-color);
+  border-radius: var(--radius-md);
+  background-color: var(--primary-light);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.bulk-info {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.bulk-actions select {
+  width: auto;
+  max-width: 15rem;
+}
+
+.bulk-bar .btn-subtle {
+  background-color: var(--bg-card);
+}
+
+.bulk-bar .btn-subtle-danger {
+  background-color: var(--bg-card);
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+/* Colonnes sélection & pointage */
+.transactions-table .cell-select {
+  width: 2.25rem;
+  padding-left: 0.85rem;
+  padding-right: 0.25rem;
+}
+
+.transactions-table input[type="checkbox"],
+.checkbox-label input[type="checkbox"] {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--primary-color);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.transactions-table .cell-reconcile {
+  text-align: center;
+  width: 4.5rem;
+}
+
+.transactions-table tbody tr.is-selected,
+.transactions-table tbody tr.is-selected:hover {
+  background-color: var(--primary-light);
+}
+
+.reconcile-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-full);
+  border: 1.5px dashed var(--border-subtle);
+  background: transparent;
+  color: transparent;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.reconcile-btn:hover {
+  border-color: var(--income-color);
+  color: var(--income-color);
+}
+
+.reconcile-btn.is-on {
+  border: 1.5px solid var(--income-color);
+  background-color: var(--income-color);
+  color: #ffffff;
+}
+
+.reconcile-btn.is-on:hover {
+  filter: brightness(1.08);
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+/* Solde pointé */
+.balance-reconciled {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--income-color);
+}
+
+.account-card-reconciled {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* Pastilles de couleur d'accent */
+.accent-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.accent-swatch {
+  position: relative;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--bg-card);
+  background-color: var(--swatch);
+  box-shadow: 0 0 0 1px var(--border-subtle);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.accent-swatch:hover {
+  transform: scale(1.08);
+}
+
+.accent-swatch.active {
+  box-shadow: 0 0 0 2px var(--text-primary);
+}
+
+.accent-swatch.active::after {
+  content: '✓';
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.accent-swatch-custom {
+  background: conic-gradient(#ef4444, #eab308, #22c55e, #06b6d4, #3b82f6, #a855f7, #ef4444);
+  overflow: hidden;
+}
+
+.accent-swatch-custom.active {
+  background: var(--swatch);
+}
+
+.accent-swatch-custom span {
+  color: #ffffff;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.accent-swatch-custom.active span {
+  display: none;
+}
+
+.accent-swatch-custom input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+
+/* Boutons-onglets (thème) dans un .type-toggle */
+.type-toggle button.toggle-option {
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.modal-actions-split {
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Mode confidentialité : bouton actif */
+#privacyToggleBtn[aria-pressed="true"] {
+  background: var(--primary-light);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+#settingsBtn:hover {
+  transform: rotate(30deg);
+}
+
+/* Bandeau « nouvelle version » (variante couleur d'accent du bandeau de sauvegarde) */
+.update-banner,
+[data-theme="dark"] .update-banner {
+  border-color: rgba(var(--primary-rgb), 0.4);
+  border-left-color: var(--primary-color);
+  background-color: var(--primary-light);
+  color: var(--text-primary);
+}
+
+.update-banner .backup-banner-icon {
+  color: var(--primary-color);
+}
+
+[data-theme="dark"] .update-banner .btn-subtle {
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+/* Assistant de bienvenue */
+.onboarding-card {
+  max-width: 540px;
+}
+
+.onboarding-top {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.onboarding-progress {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.onboarding-dot {
+  width: 1.6rem;
+  height: 0.35rem;
+  border-radius: var(--radius-full);
+  background-color: var(--bg-hover);
+  transition: background-color var(--transition-normal);
+}
+
+.onboarding-dot.active,
+.onboarding-dot.done {
+  background-color: var(--primary-color);
+}
+
+.onboarding-dot.done {
+  opacity: 0.5;
+}
+
+.onboarding-step-label {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.onboarding-hero-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  color: var(--primary-color);
+  margin-bottom: 0.75rem;
+}
+
+.onboarding-title {
+  font-size: 1.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.onboarding-text {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.25rem;
+  line-height: 1.55;
+}
+
+.onboarding-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.onboarding-choice {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.85rem 1.1rem;
+  text-align: left;
+  white-space: normal;
+}
+
+.onboarding-choice-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.onboarding-choice-desc {
+  font-size: 0.8rem;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.onboarding-tip {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  background-color: var(--bg-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .header-right {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  .site-nav {
+    order: 5;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .bulk-bar,
+  .bulk-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bulk-actions select {
+    max-width: none;
+    width: 100%;
+  }
+
+  .period-bar {
+    justify-content: center;
+  }
+
+  .period-date-field {
+    flex: 1 1 100%;
+  }
+
+  .period-date-field input {
+    flex: 1;
   }
 }

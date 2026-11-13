@@ -3,7 +3,7 @@
  * Gestion du cache hors-ligne pour un fonctionnement autonome
  */
 
-const CACHE_NAME = 'budget-manager-cache-v5.0.1';
+const CACHE_NAME = 'budget-manager-cache-v5.1.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -15,13 +15,21 @@ const ASSETS_TO_CACHE = [
   './icon.png'
 ];
 
-// Installation : mise en cache initiale des ressources
+// Installation : mise en cache initiale des ressources.
+// Une nouvelle version reste « en attente » : l'application affiche alors le bandeau
+// « Nouvelle version disponible » et c'est l'utilisateur qui déclenche l'activation.
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
+    // cache: 'reload' contourne le cache HTTP du navigateur pour récupérer la vraie nouvelle version
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE.map((url) => new Request(url, { cache: 'reload' }))))
   );
+});
+
+// Activation demandée depuis la page (bouton « Mettre à jour »)
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Activation : nettoyage des anciens caches
