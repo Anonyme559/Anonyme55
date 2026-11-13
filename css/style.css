@@ -2616,6 +2616,7 @@ select:focus {
 }
 
 .accent-swatch {
+  --swatch: var(--primary-color); /* valeur par défaut, remplacée en ligne par le JS */
   position: relative;
   width: 2.1rem;
   height: 2.1rem;
