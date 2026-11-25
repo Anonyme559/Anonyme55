@@ -3,7 +3,7 @@
  * Gestion du cache hors-ligne pour un fonctionnement autonome
  */
 
-const CACHE_NAME = 'budget-manager-cache-v5.1.0';
+const CACHE_NAME = 'budget-manager-cache-v5.2.0';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

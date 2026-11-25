@@ -4,6 +4,22 @@ Toutes les modifications notables apportées à ce projet sont documentées dans
 
 ---
 
+## [5.2.0] - 2026-11-25
+
+### 🚀 Nouvelles fonctionnalités
+- **Calendrier des dépenses** (section Statistiques) : une grille du mois, du lundi au dimanche, où chaque jour est plus ou moins coloré selon le montant dépensé.
+  - Navigation ‹ mois précédent / suivant › propre au calendrier (+ « Mois en cours ») ; par défaut, il suit le mois du filtre de période ;
+  - Respecte le filtre de compte ; jour actuel encadré, jours à venir atténués ;
+  - Résumé du mois : total, moyenne par jour écoulé, jour le plus dépensier, nombre de jours sans dépense ;
+  - Un clic sur un jour affiche ses opérations, avec un bouton « Voir dans la liste » qui filtre le tableau sur ce jour.
+- **Suggestions automatiques** dans le formulaire d'ajout : le champ Description propose les descriptions déjà utilisées (pour le type choisi). En choisissant l'une d'elles, la catégorie, le compte et le montant de la dernière opération correspondante sont repris. Un montant tapé à la main n'est jamais écrasé.
+- **Dupliquer une transaction** : nouveau bouton sur chaque ligne du tableau. La copie est créée à la date du jour (non pointée) et le message propose de la modifier aussitôt.
+
+### 🔧 Technique
+- Cache du service worker passé en `v5.2.0` (le bandeau « Nouvelle version disponible » s'affichera pour les visiteurs existants).
+
+---
+
 ## [5.1.0] - 2026-11-13
 
 ### 🚀 Nouvelles fonctionnalités

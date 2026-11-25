@@ -55,7 +55,7 @@
         </nav>
         <button type="button" id="versionBadgeBtn" class="version-badge" title="Afficher le journal des versions (Changelog)">
           <span class="version-dot"></span>
-          <span>v5.1.0</span>
+          <span>v5.2.0</span>
         </button>
         <button type="button" id="privacyToggleBtn" class="theme-toggle-btn" aria-pressed="false" title="Masquer les montants (mode confidentialité)" aria-label="Masquer les montants (mode confidentialité)">
           <svg class="icon-theme icon-eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -271,7 +271,9 @@
           <!-- Description (optionnelle) -->
           <div class="form-group">
             <label for="txDescription" class="form-label">Description <span class="optional">(optionnelle)</span></label>
-            <input type="text" id="txDescription" name="txDescription" maxlength="120" placeholder="Ex: Courses hebdomadaires, Facture électricité, Prime...">
+            <input type="text" id="txDescription" name="txDescription" maxlength="120" list="txDescriptionSuggestions" autocomplete="off" placeholder="Ex: Courses hebdomadaires, Facture électricité, Prime...">
+            <datalist id="txDescriptionSuggestions"></datalist>
+            <p id="txSuggestionHint" class="form-hint hidden" aria-live="polite"></p>
           </div>
 
           <!-- Bouton Ajouter -->
@@ -610,6 +612,36 @@
             <span id="statNetFlow" class="stat-value">0,00 €</span>
             <span id="statSavingsRate" class="stat-detail">Revenus – Dépenses</span>
           </div>
+        </div>
+
+        <!-- Calendrier des dépenses -->
+        <div class="chart-panel calendar-panel" id="spendingCalendarPanel">
+          <div class="calendar-header">
+            <h3 class="subsection-title">Calendrier des dépenses</h3>
+            <div class="calendar-nav">
+              <button type="button" id="calPrevBtn" class="btn btn-subtle btn-sm" aria-label="Mois précédent" title="Mois précédent">‹</button>
+              <span id="calMonthLabel" class="period-month-label" aria-live="polite"></span>
+              <button type="button" id="calNextBtn" class="btn btn-subtle btn-sm" aria-label="Mois suivant" title="Mois suivant">›</button>
+              <button type="button" id="calTodayBtn" class="btn-link hidden">Mois en cours</button>
+            </div>
+          </div>
+          <div class="cal-weekdays" aria-hidden="true">
+            <span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span>
+          </div>
+          <div id="spendingCalendarGrid" class="cal-grid" role="group" aria-label="Dépenses par jour du mois"></div>
+          <div class="calendar-footer">
+            <div class="cal-legend" aria-hidden="true">
+              <span>Moins</span>
+              <span class="cal-legend-box" data-level="0"></span>
+              <span class="cal-legend-box" data-level="1"></span>
+              <span class="cal-legend-box" data-level="2"></span>
+              <span class="cal-legend-box" data-level="3"></span>
+              <span class="cal-legend-box" data-level="4"></span>
+              <span>Plus</span>
+            </div>
+            <div id="spendingCalendarSummary" class="cal-summary"></div>
+          </div>
+          <div id="calendarDayDetail" class="cal-detail hidden" aria-live="polite"></div>
         </div>
 
         <!-- Graphiques Donut interactifs -->
@@ -1110,7 +1142,7 @@
       <div class="modal-header">
         <div class="modal-title-with-badge">
           <h3 id="changelogModalTitle" class="modal-title">Journal des versions</h3>
-          <span class="version-tag">Actuelle : v5.1.0</span>
+          <span class="version-tag">Actuelle : v5.2.0</span>
         </div>
         <button type="button" id="closeChangelogModalBtn" class="btn-close-modal" aria-label="Fermer le journal des versions">&times;</button>
       </div>
@@ -1168,7 +1200,7 @@
       </div>
 
       <div class="footer-credits">
-        <p><strong>Budget Manager</strong> <button type="button" id="footerVersionBtn" class="footer-version-btn" title="Voir les notes de version">v5.1.0</button> — Outil de gestion financière personnelle, simple, sécurisé et 100% local.</p>
+        <p><strong>Budget Manager</strong> <button type="button" id="footerVersionBtn" class="footer-version-btn" title="Voir les notes de version">v5.2.0</button> — Outil de gestion financière personnelle, simple, sécurisé et 100% local.</p>
         <p class="legal-note">Toutes les données sont stockées exclusivement dans la mémoire locale de votre navigateur (localStorage). Aucun compte, aucun serveur, aucune collecte.</p>
         <p class="legal-note" id="lastBackupInfo"></p>
       </div>

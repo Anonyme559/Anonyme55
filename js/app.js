@@ -10,7 +10,7 @@
   // 1. Constantes & Catégories par défaut
   // ==========================================================================
 
-  const APP_VERSION = '5.1.0';
+  const APP_VERSION = '5.2.0';
 
   const STORAGE_KEY_TRANSACTIONS = 'budget_manager_transactions';
   const STORAGE_KEY_INITIAL_BALANCE = 'budget_manager_initial_balance';
@@ -70,6 +70,17 @@
 
   // Historique des versions (Changelog officiel)
   const CHANGELOG_HISTORY = [
+    {
+      version: '5.2.0',
+      date: '2026-11-25',
+      title: 'Calendrier des dépenses, suggestions automatiques & duplication',
+      changes: [
+        'Calendrier des dépenses dans les statistiques : chaque jour du mois est coloré selon le montant dépensé ; un clic affiche les opérations du jour',
+        'Suggestions automatiques : en tapant une description déjà utilisée, la catégorie, le compte et le montant de la dernière opération sont repris',
+        'Bouton « Dupliquer » sur chaque transaction : la copie est créée à la date du jour, prête à être modifiée'
+      ],
+      files: ['index.html', 'css/style.css', 'js/app.js', 'sw.js', 'CHANGELOG.md']
+    },
     {
       version: '5.1.0',
       date: '2026-11-13',
@@ -385,6 +396,8 @@
     searchQuery: '',
     selectedTxIds: new Set(),
     onboardingStep: 1,
+    calendarMonth: null,
+    calendarSelectedDay: null,
     currentTheme: 'light',
     lastDeletedTx: null
   };
@@ -458,6 +471,8 @@
     txCategorySelect: document.getElementById('txCategory'),
     txDateInput: document.getElementById('txDate'),
     txDescriptionInput: document.getElementById('txDescription'),
+    txDescriptionSuggestions: document.getElementById('txDescriptionSuggestions'),
+    txSuggestionHint: document.getElementById('txSuggestionHint'),
 
     // Modale d'édition de transaction
     editModal: document.getElementById('editModal'),
@@ -671,6 +686,15 @@
     onboardingThemeDark: document.getElementById('onboardingThemeDark'),
     onboardingFinishBtn: document.getElementById('onboardingFinishBtn'),
 
+    // Calendrier des dépenses
+    spendingCalendarGrid: document.getElementById('spendingCalendarGrid'),
+    spendingCalendarSummary: document.getElementById('spendingCalendarSummary'),
+    calendarDayDetail: document.getElementById('calendarDayDetail'),
+    calMonthLabel: document.getElementById('calMonthLabel'),
+    calPrevBtn: document.getElementById('calPrevBtn'),
+    calNextBtn: document.getElementById('calNextBtn'),
+    calTodayBtn: document.getElementById('calTodayBtn'),
+
     // Mise à jour de l'application (Service Worker)
     updateBanner: document.getElementById('updateBanner'),
     updateNowBtn: document.getElementById('updateNowBtn'),
@@ -701,6 +725,32 @@
       } catch (e) { /* option non supportée par ce navigateur : essai suivant */ }
     }
     return currencyFormatter;
+  }
+
+  let compactFormatter = null;
+  let compactFormatterKey = '';
+
+  /**
+   * Montant arrondi à l'unité (cases du calendrier). Respecte le mode confidentialité.
+   * @param {number} amount
+   * @returns {string}
+   */
+  function formatCurrencyCompact(amount) {
+    if (state.settings.privacyMode) return '•••';
+    const base = getCurrencyFormatter().resolvedOptions();
+    const key = base.currency + '|' + base.currencyDisplay;
+    if (!compactFormatter || compactFormatterKey !== key) {
+      try {
+        compactFormatter = new Intl.NumberFormat('fr-FR', {
+          style: 'currency', currency: base.currency, currencyDisplay: base.currencyDisplay,
+          minimumFractionDigits: 0, maximumFractionDigits: 0
+        });
+      } catch (e) {
+        compactFormatter = getCurrencyFormatter();
+      }
+      compactFormatterKey = key;
+    }
+    return compactFormatter.format(Number.isFinite(amount) ? Math.round(amount) : 0);
   }
 
   /** Symbole de la devise d'affichage (ex. « € », « $ », « CHF ») */
@@ -3078,6 +3128,117 @@
       if (dom.labelTxAccount) dom.labelTxAccount.innerHTML = 'Compte / Portefeuille <span class="required">*</span>';
       populateCategorySelect(dom.txCategorySelect, 'expense');
     }
+    refreshDescriptionSuggestions();
+  }
+
+  // --------------------------------------------------------------------------
+  // Suggestions automatiques (description ➔ catégorie, compte, montant)
+  // --------------------------------------------------------------------------
+
+  /** Type sélectionné dans le formulaire d'ajout */
+  function getMainFormType() {
+    if (dom.typeTransferRadio && dom.typeTransferRadio.checked) return 'transfer';
+    if (dom.typeIncomeRadio && dom.typeIncomeRadio.checked) return 'income';
+    return 'expense';
+  }
+
+  function normalizeDescription(text) {
+    return (text || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  }
+
+  /**
+   * Descriptions déjà utilisées pour un type, avec la transaction la plus récente
+   * de chacune. Triées par fréquence d'utilisation puis par date.
+   * @returns {Map<string, {label: string, count: number, tx: object}>}
+   */
+  function buildDescriptionSuggestions(type) {
+    const groups = new Map();
+    state.transactions.forEach(tx => {
+      if (tx.type !== type || !tx.description) return;
+      const key = normalizeDescription(tx.description);
+      if (!key) return;
+      const group = groups.get(key);
+      if (!group) {
+        groups.set(key, { label: tx.description.trim(), count: 1, tx });
+        return;
+      }
+      group.count++;
+      const newer = (tx.date || '') > (group.tx.date || '')
+        || ((tx.date || '') === (group.tx.date || '') && (tx.createdAt || 0) > (group.tx.createdAt || 0));
+      if (newer) {
+        group.tx = tx;
+        group.label = tx.description.trim();
+      }
+    });
+    const sorted = [...groups.entries()].sort((a, b) =>
+      b[1].count - a[1].count || (b[1].tx.date || '').localeCompare(a[1].tx.date || ''));
+    return new Map(sorted);
+  }
+
+  let descriptionSuggestions = new Map();
+
+  /** Remplit la liste de suggestions du champ Description (50 au maximum) */
+  function refreshDescriptionSuggestions() {
+    descriptionSuggestions = buildDescriptionSuggestions(getMainFormType());
+    if (!dom.txDescriptionSuggestions) return;
+    dom.txDescriptionSuggestions.innerHTML = [...descriptionSuggestions.values()]
+      .slice(0, 50)
+      .map(g => `<option value="${escapeHtml(g.label)}"></option>`)
+      .join('');
+  }
+
+  function hideSuggestionHint() {
+    if (!dom.txSuggestionHint) return;
+    dom.txSuggestionHint.textContent = '';
+    dom.txSuggestionHint.classList.add('hidden');
+  }
+
+  function selectHasOption(select, value) {
+    return !!select && Array.from(select.options).some(o => o.value === value);
+  }
+
+  /**
+   * Si la description saisie a déjà été utilisée, reprend la catégorie, le compte
+   * et le montant de la dernière opération correspondante. Un montant tapé à la
+   * main n'est jamais écrasé.
+   */
+  function applyDescriptionSuggestion() {
+    if (!dom.txDescriptionInput) return;
+    const group = descriptionSuggestions.get(normalizeDescription(dom.txDescriptionInput.value));
+    if (!group) {
+      hideSuggestionHint();
+      return;
+    }
+    const tx = group.tx;
+    const filled = [];
+
+    if (tx.type !== 'transfer' && selectHasOption(dom.txCategorySelect, tx.category)
+      && dom.txCategorySelect.value !== tx.category) {
+      dom.txCategorySelect.value = tx.category;
+      filled.push('catégorie');
+    }
+
+    if (selectHasOption(dom.txAccountSelect, tx.accountId) && dom.txAccountSelect.value !== tx.accountId) {
+      dom.txAccountSelect.value = tx.accountId;
+      filled.push('compte');
+    }
+    if (tx.type === 'transfer' && tx.toAccountId && tx.toAccountId !== dom.txAccountSelect.value
+      && selectHasOption(dom.txTargetAccountSelect, tx.toAccountId)) {
+      dom.txTargetAccountSelect.value = tx.toAccountId;
+    }
+
+    const amountInput = dom.txAmountInput;
+    if (amountInput && (amountInput.value === '' || amountInput.dataset.autofilled === '1')) {
+      amountInput.value = tx.amount.toFixed(2);
+      amountInput.dataset.autofilled = '1';
+      filled.push('montant');
+    }
+
+    if (dom.txSuggestionHint) {
+      dom.txSuggestionHint.textContent = `Repris de « ${group.label} » du ${formatDateFr(tx.date)}`
+        + (filled.length ? ` (${filled.join(', ')})` : '') + '.';
+      dom.txSuggestionHint.classList.remove('hidden');
+    }
   }
 
   function handleEditTypeChange(selectedType) {
@@ -3661,6 +3822,12 @@
                   <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
                 </svg>
               </button>
+              <button type="button" class="btn-edit-icon duplicate-tx-btn" data-id="${escapeHtml(tx.id)}" title="Dupliquer (copie à la date du jour)" aria-label="Dupliquer la transaction">
+                <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
               <button type="button" class="btn-danger-icon delete-tx-btn" data-id="${escapeHtml(tx.id)}" title="Supprimer la transaction" aria-label="Supprimer la transaction">
                 <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <polyline points="3 6 5 6 21 6"></polyline>
@@ -3674,6 +3841,34 @@
     }).join('');
 
     renderSelectionUi(pageItems, filtered.length);
+  }
+
+  /**
+   * Copie une transaction à la date du jour (sans pointage ni lien de récurrence).
+   * Un versement d'épargne reste rattaché à son objectif s'il existe toujours.
+   */
+  function duplicateTransaction(id) {
+    const source = state.transactions.find(t => t.id === id);
+    if (!source) return;
+
+    const copy = {
+      id: generateId(),
+      type: source.type,
+      amount: source.amount,
+      accountId: source.accountId,
+      category: source.category,
+      description: source.description || '',
+      date: getTodayDateString(),
+      createdAt: Date.now()
+    };
+    if (source.type === 'transfer' && source.toAccountId) copy.toAccountId = source.toAccountId;
+    if (source.goalId && state.goals.some(g => g.id === source.goalId)) copy.goalId = source.goalId;
+
+    state.transactions.unshift(copy);
+    saveTransactionsToStorage();
+    state.currentPage = 1;
+    updateUI();
+    showToast('Transaction dupliquée à la date du jour', 'Modifier', () => openEditModal(copy.id));
   }
 
   // ==========================================================================
@@ -3838,6 +4033,8 @@
   /** Un changement de filtre repart de la page 1 et vide la sélection */
   function onFiltersChanged() {
     state.currentPage = 1;
+    state.calendarMonth = null;
+    state.calendarSelectedDay = null;
     clearSelection();
     renderPeriodControls();
     updateUI();
@@ -3910,6 +4107,7 @@
 
     renderCategoryBreakdown(dom.expenseCategoryBreakdown, expenseByCategory, expenseTotal, 'expense');
     renderCategoryBreakdown(dom.incomeCategoryBreakdown, incomeByCategory, incomeTotal, 'income');
+    renderSpendingCalendar();
   }
 
   function renderDonutChart(container, categoryData, total, type, title) {
@@ -3997,6 +4195,177 @@
         </div>
       `;
     }).join('');
+  }
+
+  // --------------------------------------------------------------------------
+  // Calendrier des dépenses
+  // --------------------------------------------------------------------------
+
+  /**
+   * Mois affiché par le calendrier : celui choisi avec ses flèches, sinon le mois
+   * de la période personnalisée (si elle tient dans un seul mois), sinon le mois
+   * suivi par les budgets.
+   */
+  function getCalendarMonthKey() {
+    if (state.calendarMonth) return state.calendarMonth;
+    if (state.filterPeriod === 'custom') {
+      const { from, to } = getCustomRange();
+      if (from && to && from.slice(0, 7) === to.slice(0, 7)) return from.slice(0, 7);
+    }
+    return getBudgetMonthKey();
+  }
+
+  /** "2026-11-12" ➔ "jeudi 12 novembre" (ou "12 novembre") */
+  function formatLongDay(dateStr, withWeekday = true) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const options = withWeekday ? { weekday: 'long', day: 'numeric', month: 'long' } : { day: 'numeric', month: 'long' };
+    return new Date(y, m - 1, d).toLocaleDateString('fr-FR', options);
+  }
+
+  function renderSpendingCalendar() {
+    if (!dom.spendingCalendarGrid) return;
+
+    const monthKey = getCalendarMonthKey();
+    const [year, month] = monthKey.split('-').map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const today = getTodayDateString();
+    const currentMonthKey = getMonthKey();
+
+    // Dépenses du mois par jour, dans le périmètre du compte filtré
+    const totals = new Array(daysInMonth + 1).fill(0);
+    const counts = new Array(daysInMonth + 1).fill(0);
+    state.transactions.forEach(tx => {
+      if (tx.type !== 'expense' || !tx.date || tx.date.slice(0, 7) !== monthKey) return;
+      if (!isTxInAccountScope(tx, state.filterAccount)) return;
+      const d = Number(tx.date.slice(8, 10));
+      if (d >= 1 && d <= daysInMonth) {
+        totals[d] += tx.amount;
+        counts[d]++;
+      }
+    });
+    const max = Math.max(0, ...totals);
+
+    if (dom.calMonthLabel) dom.calMonthLabel.textContent = formatMonthLabel(monthKey);
+    if (dom.calTodayBtn) dom.calTodayBtn.classList.toggle('hidden', monthKey === currentMonthKey);
+    if (state.calendarSelectedDay && state.calendarSelectedDay.slice(0, 7) !== monthKey) state.calendarSelectedDay = null;
+
+    // Grille commençant le lundi
+    const leadingBlanks = (new Date(year, month - 1, 1).getDay() + 6) % 7;
+    let html = '<span class="cal-day cal-empty" aria-hidden="true"></span>'.repeat(leadingBlanks);
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${monthKey}-${String(d).padStart(2, '0')}`;
+      const amount = totals[d];
+      const ratio = max > 0 ? amount / max : 0;
+      const level = amount <= 0 ? 0 : ratio <= 0.25 ? 1 : ratio <= 0.5 ? 2 : ratio <= 0.75 ? 3 : 4;
+      const isSelected = dateStr === state.calendarSelectedDay;
+      const classes = ['cal-day'];
+      if (dateStr === today) classes.push('is-today');
+      if (dateStr > today) classes.push('is-future');
+      if (isSelected) classes.push('is-selected');
+      const label = amount > 0
+        ? `${formatLongDay(dateStr)} : ${formatCurrency(amount)} de dépenses, ${counts[d]} opération${counts[d] > 1 ? 's' : ''}`
+        : `${formatLongDay(dateStr)} : aucune dépense`;
+      html += `
+        <button type="button" class="${classes.join(' ')}" data-date="${dateStr}" data-level="${level}"
+          aria-pressed="${isSelected ? 'true' : 'false'}" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">
+          <span class="cal-day-num">${d}</span>
+          <span class="cal-day-amount">${amount > 0 ? formatCurrencyCompact(amount) : ''}</span>
+        </button>`;
+    }
+    dom.spendingCalendarGrid.innerHTML = html;
+
+    // Résumé du mois
+    if (dom.spendingCalendarSummary) {
+      const monthTotal = totals.reduce((a, b) => a + b, 0);
+      let elapsedDays = daysInMonth;
+      if (monthKey === currentMonthKey) elapsedDays = Number(today.slice(8, 10));
+      else if (monthKey > currentMonthKey) elapsedDays = 0;
+      const daysWithoutExpense = totals.slice(1, elapsedDays + 1).filter(v => v <= 0).length;
+      const maxDay = max > 0 ? totals.indexOf(max) : 0;
+
+      const items = [`<span>Total : <strong>${formatCurrency(monthTotal)}</strong></span>`];
+      if (elapsedDays > 0) {
+        items.push(`<span>Moyenne par jour : <strong>${formatCurrency(monthTotal / elapsedDays)}</strong></span>`);
+      }
+      if (maxDay > 0) {
+        const maxDayLabel = formatLongDay(`${monthKey}-${String(maxDay).padStart(2, '0')}`, false);
+        items.push(`<span>Jour le plus dépensier : <strong>${escapeHtml(maxDayLabel)}</strong> (${formatCurrency(max)})</span>`);
+      }
+      if (elapsedDays > 0) {
+        items.push(`<span>Jours sans dépense : <strong>${daysWithoutExpense}</strong> / ${elapsedDays}</span>`);
+      }
+      dom.spendingCalendarSummary.innerHTML = items.join('');
+    }
+
+    renderCalendarDayDetail();
+  }
+
+  /** Opérations du jour sélectionné dans le calendrier */
+  function renderCalendarDayDetail() {
+    if (!dom.calendarDayDetail) return;
+    const day = state.calendarSelectedDay;
+    if (!day) {
+      dom.calendarDayDetail.innerHTML = '';
+      dom.calendarDayDetail.classList.add('hidden');
+      return;
+    }
+
+    const items = state.transactions
+      .filter(tx => tx.date === day && isTxInAccountScope(tx, state.filterAccount))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    const rows = items.map(tx => {
+      let sign = '-';
+      let cls = 'expense';
+      if (tx.type === 'income') { sign = '+'; cls = 'income'; }
+      if (tx.type === 'transfer') { sign = '⇄ '; cls = 'transfer'; }
+      const category = tx.type === 'transfer'
+        ? `${getAccountName(tx.accountId)} ➔ ${getAccountName(tx.toAccountId)}`
+        : (tx.category || '');
+      return `
+        <li class="cal-detail-item">
+          <span class="cal-detail-desc">
+            <span class="cal-detail-title">${escapeHtml(tx.description || category || '—')}</span>
+            ${tx.description ? `<span class="cal-detail-cat">${escapeHtml(category)}</span>` : ''}
+          </span>
+          <span class="cell-amount ${cls}">${sign}${formatCurrency(tx.amount)}</span>
+        </li>`;
+    }).join('');
+
+    const title = formatLongDay(day);
+    dom.calendarDayDetail.innerHTML = `
+      <div class="cal-detail-header">
+        <h4 class="cal-detail-heading">${escapeHtml(title.charAt(0).toUpperCase() + title.slice(1))}</h4>
+        <div class="cal-detail-actions">
+          ${items.length ? '<button type="button" class="btn btn-subtle btn-sm" id="calShowInListBtn">Voir dans la liste</button>' : ''}
+          <button type="button" class="btn-link" id="calCloseDetailBtn">Fermer</button>
+        </div>
+      </div>
+      ${items.length
+        ? `<ul class="cal-detail-list">${rows}</ul>`
+        : '<p class="category-empty-note">Aucune opération ce jour-là.</p>'}`;
+    dom.calendarDayDetail.classList.remove('hidden');
+  }
+
+  /** Flèches du calendrier (delta = 0 : revenir au mois en cours) */
+  function shiftCalendarMonth(delta) {
+    state.calendarMonth = delta === 0 ? getMonthKey() : shiftMonthKey(getCalendarMonthKey(), delta);
+    state.calendarSelectedDay = null;
+    renderSpendingCalendar();
+  }
+
+  /** Filtre la liste des transactions sur le jour sélectionné */
+  function showCalendarDayInList() {
+    const day = state.calendarSelectedDay;
+    if (!day) return;
+    state.filterPeriod = 'custom';
+    state.filterFrom = day;
+    state.filterTo = day;
+    onFiltersChanged();
+    state.calendarSelectedDay = day;
+    renderSpendingCalendar();
+    const section = document.getElementById('transactions');
+    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // ==========================================================================
@@ -4113,6 +4482,7 @@
     renderGoals();
     renderRecurring();
     renderStats();
+    refreshDescriptionSuggestions();
   }
 
   // ==========================================================================
@@ -5066,6 +5436,44 @@
       });
     }
 
+    // 7 ter. Calendrier des dépenses
+    if (dom.spendingCalendarGrid) {
+      dom.spendingCalendarGrid.addEventListener('click', (e) => {
+        const cell = e.target.closest('.cal-day[data-date]');
+        if (!cell) return;
+        const date = cell.getAttribute('data-date');
+        state.calendarSelectedDay = state.calendarSelectedDay === date ? null : date;
+        renderSpendingCalendar();
+        const again = dom.spendingCalendarGrid.querySelector(`.cal-day[data-date="${date}"]`);
+        if (again) again.focus();
+      });
+    }
+    if (dom.calendarDayDetail) {
+      dom.calendarDayDetail.addEventListener('click', (e) => {
+        if (e.target.closest('#calShowInListBtn')) {
+          showCalendarDayInList();
+        } else if (e.target.closest('#calCloseDetailBtn')) {
+          const date = state.calendarSelectedDay;
+          state.calendarSelectedDay = null;
+          renderSpendingCalendar();
+          const cell = date && dom.spendingCalendarGrid.querySelector(`.cal-day[data-date="${date}"]`);
+          if (cell) cell.focus();
+        }
+      });
+    }
+    if (dom.calPrevBtn) dom.calPrevBtn.addEventListener('click', () => shiftCalendarMonth(-1));
+    if (dom.calNextBtn) dom.calNextBtn.addEventListener('click', () => shiftCalendarMonth(1));
+    if (dom.calTodayBtn) dom.calTodayBtn.addEventListener('click', () => shiftCalendarMonth(0));
+
+    // 7 bis. Suggestions automatiques sur la description
+    if (dom.txDescriptionInput) {
+      dom.txDescriptionInput.addEventListener('input', applyDescriptionSuggestion);
+      dom.txDescriptionInput.addEventListener('change', applyDescriptionSuggestion);
+    }
+    if (dom.txAmountInput) {
+      dom.txAmountInput.addEventListener('input', () => { delete dom.txAmountInput.dataset.autofilled; });
+    }
+
     // 8. Soumission du formulaire d'ajout
     if (dom.transactionForm) {
       dom.transactionForm.addEventListener('submit', (e) => {
@@ -5116,8 +5524,10 @@
         saveTransactionsToStorage();
 
         dom.txAmountInput.value = '';
+        delete dom.txAmountInput.dataset.autofilled;
         dom.txDescriptionInput.value = '';
         dom.txDateInput.value = getTodayDateString();
+        hideSuggestionHint();
 
         state.currentPage = 1;
         updateUI();
@@ -5224,6 +5634,12 @@
         if (editBtn) {
           const id = editBtn.getAttribute('data-id');
           openEditModal(id);
+          return;
+        }
+
+        const duplicateBtn = e.target.closest('.duplicate-tx-btn');
+        if (duplicateBtn) {
+          duplicateTransaction(duplicateBtn.getAttribute('data-id'));
           return;
         }
 

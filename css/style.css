@@ -2851,3 +2851,326 @@ select:focus {
     flex: 1;
   }
 }
+
+/* --------------------------------------------------------------------------
+   15. v5.2 — Calendrier des dépenses, suggestions & duplication
+   -------------------------------------------------------------------------- */
+
+/* Indice sous le champ Description (suggestions automatiques) */
+.form-hint {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Panneau calendrier */
+.calendar-panel {
+  margin-bottom: 1.5rem;
+  scroll-margin-top: 6rem;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.calendar-header .subsection-title {
+  margin-bottom: 0;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.calendar-nav .btn-sm {
+  min-width: 2rem;
+  justify-content: center;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-card);
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.calendar-nav .period-month-label {
+  min-width: 8.5rem;
+}
+
+.cal-weekdays,
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.cal-weekdays {
+  margin-bottom: 0.35rem;
+}
+
+.cal-weekdays span {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.cal-day {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  min-height: 3.4rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+/* Intensité : calque de la couleur des dépenses plus ou moins opaque */
+.cal-day::before,
+.cal-legend-box::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-color: var(--expense-color);
+  opacity: 0;
+}
+
+.cal-day[data-level="1"]::before,
+.cal-legend-box[data-level="1"]::before { opacity: 0.2; }
+
+.cal-day[data-level="2"]::before,
+.cal-legend-box[data-level="2"]::before { opacity: 0.4; }
+
+.cal-day[data-level="3"]::before,
+.cal-legend-box[data-level="3"]::before { opacity: 0.62; }
+
+.cal-day[data-level="4"]::before,
+.cal-legend-box[data-level="4"]::before { opacity: 0.85; }
+
+.cal-day[data-level="3"],
+.cal-day[data-level="4"] {
+  color: #ffffff;
+}
+
+.cal-day:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.cal-day:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.cal-day.cal-empty {
+  visibility: hidden;
+  cursor: default;
+}
+
+.cal-day.is-future {
+  opacity: 0.55;
+}
+
+.cal-day.is-today {
+  border: 2px solid var(--primary-color);
+}
+
+.cal-day.is-selected {
+  box-shadow: 0 0 0 2px var(--text-primary);
+}
+
+.cal-day-num {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.cal-day-amount {
+  align-self: flex-end;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Légende & résumé */
+.calendar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.25rem;
+  margin-top: 0.85rem;
+}
+
+.cal-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.cal-legend-box {
+  position: relative;
+  isolation: isolate;
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  background-color: var(--bg-card);
+  overflow: hidden;
+}
+
+.cal-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.cal-summary strong {
+  color: var(--text-primary);
+}
+
+/* Détail du jour sélectionné */
+.cal-detail {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-card);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.cal-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.cal-detail-heading {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cal-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cal-detail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cal-detail-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border-light);
+  font-size: 0.875rem;
+}
+
+.cal-detail-item:first-child {
+  border-top: none;
+}
+
+.cal-detail-desc {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cal-detail-title {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-detail-cat {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Tableau plus compact : il tient sans défilement horizontal sur un écran de bureau */
+.transactions-table th,
+.transactions-table td {
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+}
+
+.transactions-table .account-transfer-flow {
+  flex-wrap: wrap;
+  white-space: normal;
+  row-gap: 0.2rem;
+}
+
+.transactions-table .cell-category {
+  white-space: normal;
+  min-width: 7rem;
+}
+
+.transactions-table .cell-desc {
+  max-width: 200px;
+}
+
+/* Trois boutons d'action par ligne du tableau */
+.table-actions {
+  flex-wrap: nowrap;
+  gap: 0.1rem;
+}
+
+.table-actions .btn-edit-icon,
+.table-actions .btn-danger-icon {
+  padding: 0.35rem 0.4rem;
+}
+
+@media (max-width: 480px) {
+  .cal-weekdays,
+  .cal-grid {
+    gap: 0.2rem;
+  }
+
+  .cal-day {
+    min-height: 2.4rem;
+    padding: 0.2rem;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cal-day-amount {
+    display: none;
+  }
+
+  .chart-panel.calendar-panel {
+    padding: 0.85rem;
+  }
+}
